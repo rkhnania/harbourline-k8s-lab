@@ -1,0 +1,18 @@
+# Secrets — never commit
+*.env
+!*.env.example
+db.env
+
+# Backups
+*.tgz
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
