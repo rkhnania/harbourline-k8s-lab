@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Harbourline Tracking</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 16px}
+table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:8px;text-align:left}
+#host{color:#666;font-size:14px}
+</style></head>
+<body>
+<h1>Harbourline Shipment Tracking</h1>
+<p id="host">Loading...</p>
+<table><thead><tr><th>ID</th><th>Origin</th><th>Destination</th><th>Status</th></tr></thead>
+<tbody id="rows"></tbody></table>
+<script>
+fetch('/api/health').then(r=>r.json()).then(d=>{
+  document.getElementById('host').textContent='Served by API container '+d.host+' ('+d.env+')';
+});
+fetch('/api/shipments').then(r=>r.json()).then(data=>{
+  document.getElementById('rows').innerHTML=Object.entries(data).map(([id,s])=>
+    '<tr><td>'+id+'</td><td>'+s.origin+'</td><td>'+s.destination+'</td><td>'+s.status+'</td></tr>').join('');
+});
+</script>
+</body>
+</html>

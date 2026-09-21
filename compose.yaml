@@ -1,0 +1,56 @@
+name: harbourline
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [backend-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build: ./api
+    deploy:
+      replicas: 1
+    image: harbourline/api:compose
+    env_file: ./api/db.env
+    environment:
+      DB_HOST: db
+      ENVIRONMENT: compose
+    networks: [frontend-net, backend-net]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    build: ./web
+    image: harbourline/web:compose
+    ports:
+      - "8000:80"
+    networks: [frontend-net]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    external: true
+    name: hl-pgdata
+
+networks:
+  frontend-net:
+  backend-net:
