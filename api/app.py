@@ -30,5 +30,17 @@ def dbcheck():
     except Exception as e:
         return jsonify(db="error", detail=str(e)), 500
 
+
+@app.route("/shipments")
+def shipments():
+    conninfo = f"host={DB_HOST} port={DB_PORT} user={DB_USER} password={DB_PASSWORD} dbname={DB_NAME} connect_timeout=3"
+    try:
+        with psycopg.connect(conninfo) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, status FROM shipments ORDER BY id;")
+                return jsonify({r[0]: {"origin": "-", "destination": "-", "status": r[1]} for r in cur.fetchall()})
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8080)))
