@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
-    networks: [backend-net]
+    networks: [frontend-net, backend-net]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -19,7 +19,7 @@ services:
     build: ./api
     deploy:
       replicas: 3
-    image: harbourline/api:compose
+    image: harbourline/api:v5
     env_file: ./api/db.env
     environment:
       DB_HOST: db
