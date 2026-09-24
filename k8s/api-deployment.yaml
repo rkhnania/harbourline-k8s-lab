@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harbourline-api
+  labels:
+    app: harbourline-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: harbourline-api
+  template:
+    metadata:
+      labels:
+        app: harbourline-api
+    spec:
+      containers:
+        - name: api
+          image: harbourline/api:v8
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ENVIRONMENT
+              value: kubernetes
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

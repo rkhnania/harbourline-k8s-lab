@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbourline-api
+spec:
+  type: ClusterIP
+  selector:
+    app: harbourline-api
+  ports:
+    - port: 8080
+      targetPort: 8080
