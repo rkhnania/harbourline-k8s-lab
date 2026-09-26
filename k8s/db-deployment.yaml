@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harbourline-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: harbourline-db
+  template:
+    metadata:
+      labels:
+        app: harbourline-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: harbourline-db-secret
+                  key: DB_PASSWORD
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: pgdata
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbourline-db
+spec:
+  selector:
+    app: harbourline-db
+  ports:
+    - port: 5432
+      targetPort: 5432

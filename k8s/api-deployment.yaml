@@ -16,12 +16,14 @@ spec:
     spec:
       containers:
         - name: api
-          image: harbourline/api:v8
+          image: harbourline/api:v9
           ports:
             - containerPort: 8080
-          env:
-            - name: ENVIRONMENT
-              value: kubernetes
+          envFrom:
+            - configMapRef:
+                name: harbourline-config
+            - secretRef:
+                name: harbourline-db-secret
           resources:
             requests:
               cpu: 50m
