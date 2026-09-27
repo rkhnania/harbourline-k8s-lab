@@ -1,0 +1,22 @@
+# kube-prometheus-stack values for the local kind lab.
+# Install:
+#   helm install kps prometheus-community/kube-prometheus-stack \
+#     -n monitoring --create-namespace \
+#     -f kps-values.yaml \
+#     --set grafana.adminPassword="$GRAFANA_PASSWORD"
+#
+# adminPassword is deliberately NOT stored here — pass it at install time.
+# In the capstone this moves to a Secret managed outside Git.
+
+prometheus:
+  prometheusSpec:
+    retention: 2d
+    resources:
+      requests:
+        memory: 400Mi
+
+grafana:
+  defaultDashboardsTimezone: Australia/Sydney
+
+alertmanager:
+  enabled: true
