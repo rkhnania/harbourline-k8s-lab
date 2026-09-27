@@ -24,6 +24,24 @@ spec:
                 name: harbourline-config
             - secretRef:
                 name: harbourline-db-secret
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 2
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 3
+            failureThreshold: 20
           resources:
             requests:
               cpu: 50m
