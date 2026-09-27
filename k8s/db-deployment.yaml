@@ -1,9 +1,22 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: harbourline-pgdata
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: harbourline-db
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: harbourline-db
@@ -12,6 +25,8 @@ spec:
       labels:
         app: harbourline-db
     spec:
+      nodeSelector:
+        tier: database
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -23,6 +38,8 @@ spec:
                 secretKeyRef:
                   name: harbourline-db-secret
                   key: DB_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           resources:
             requests:
               cpu: 100m
@@ -34,7 +51,8 @@ spec:
               mountPath: /var/lib/postgresql/data
       volumes:
         - name: pgdata
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: harbourline-pgdata
 ---
 apiVersion: v1
 kind: Service
