@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harbourline-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: harbourline-web
+  template:
+    metadata:
+      labels:
+        app: harbourline-web
+    spec:
+      containers:
+        - name: web
+          image: harbourline/web:k8s
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbourline-web
+spec:
+  selector:
+    app: harbourline-web
+  ports:
+    - port: 80
+      targetPort: 80
