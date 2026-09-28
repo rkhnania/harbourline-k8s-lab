@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: harbourline-db-init
+spec:
+  backoffLimit: 5
+  ttlSecondsAfterFinished: 900
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: postgres:16-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: harbourline-db-secret
+                  key: DB_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h harbourline-db -U postgres; do echo waiting for db; sleep 2; done
+              psql -h harbourline-db -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+              CREATE TABLE IF NOT EXISTS shipments (id text primary key, status text, carrier text);
+              INSERT INTO shipments VALUES
+                ('SHP-1001','in-transit','Harbourline Freight'),
+                ('SHP-2002','delayed','Harbourline Freight'),
+                ('SHP-3003','customs-hold','Harbourline Freight')
+              ON CONFLICT (id) DO NOTHING;
+              SQL
+              echo "schema and seed applied"
