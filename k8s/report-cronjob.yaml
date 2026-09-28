@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: shipment-report
+spec:
+  schedule: "*/1 * * * *"
+  timeZone: "Australia/Sydney"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: report
+              image: postgres:16-alpine
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: harbourline-db-secret
+                      key: DB_PASSWORD
+              command:
+                - sh
+                - -c
+                - |
+                  echo "Shipment status report - $(date)"
+                  psql -h harbourline-db -U postgres -t -c "SELECT status, count(*) FROM shipments GROUP BY status;"

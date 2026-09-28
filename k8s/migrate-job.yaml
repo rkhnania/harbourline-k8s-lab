@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: harbourline-migrate-001
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: postgres:16-alpine
+          env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: harbourline-db-secret
+                  key: DB_PASSWORD
+          command:
+            - sh
+            - -c
+            - |
+              psql -h harbourline-db -U postgres -v ON_ERROR_STOP=1 <<'SQL'
+              ALTER TABLE shipments ADD COLUMN IF NOT EXISTS carrier text;
+              UPDATE shipments SET carrier = 'Harbourline Freight' WHERE carrier IS NULL;
+              SQL
+              echo "migration 001 applied"
