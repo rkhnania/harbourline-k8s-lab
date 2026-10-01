@@ -38,3 +38,40 @@ kubectl logs -n <ns> $POD -c dbg
 
 ## Exit codes
 0 clean · 1 app error · 125-127 container/command problem · 137 SIGKILL (OOM) · 143 SIGTERM
+
+## Worked examples (drills)
+
+### Status `Error` / `CrashLoopBackOff`, RESTARTS climbing
+The container started and the process exited — so logs exist.
+    kubectl logs <pod> --previous --tail=20
+    kubectl describe pod <pod> | grep -B4 -A12 "Last State"
+Read the exit code: 137 = killed from outside (OOM). 1 or 2 = the app chose to exit.
+Started and Finished in the same second = a startup problem (missing file, bad config,
+can't bind a port). Dying after minutes/hours = runtime (leak, dependency).
+Then check what Kubernetes actually asked it to run:
+    kubectl get deploy <d> -o jsonpath='{.spec.template.spec.containers[0].command}'
+A `command:` override can point at a file that doesn't exist in the image.
+If `kubectl logs -l <label>` says "unable to retrieve container logs", name a single
+pod instead, and fall back to `describe` — that data lives in the API server.
+
+### Pods Running 1/1 but callers get "connection refused"
+    kubectl get endpoints <svc>
+Endpoints populated proves only that the SELECTOR matched pods. It proves nothing
+about the port. Compare the two sides:
+    kubectl get svc <svc> -o jsonpath='{.spec.ports}'
+    kubectl get deploy <d> -o jsonpath='{.spec.template.spec.containers[0].ports}'
+targetPort must match containerPort.
+refused = packet arrived, nothing listening. timed out = packet went nowhere
+(NetworkPolicy, routing, or the destination doesn't exist).
+
+### Pending — policy vs capacity
+    kubectl get events --field-selector reason=FailedScheduling --sort-by=.lastTimestamp
+"didn't match node affinity/selector" / "untolerated taint" / "were unschedulable"
+  -> POLICY. Fix the selector, add a toleration, or uncordon the node.
+"Insufficient cpu" / "Insufficient memory"
+  -> CAPACITY. Lower requests, or add nodes (Cluster Autoscaler / Karpenter on EKS).
+Unbound PVC -> VOLUME. Check `kubectl get pvc` and the storageClassName.
+On a kind cluster, ignore the "1 node(s) had untolerated taint(s)" line — that's always
+the control plane. Read what the WORKER nodes say.
+Compare against allocatable:
+    kubectl describe node <node> | grep -A8 Allocatable
