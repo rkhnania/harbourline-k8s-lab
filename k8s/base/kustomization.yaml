@@ -4,21 +4,21 @@ kind: Kustomization
 namespace: harbourline
 
 resources:
-  - configmap.yaml
-  - db-deployment.yaml
-  - db-init-job.yaml
-  - api-deployment.yaml
-  - api-service.yaml
-  - web-deployment.yaml
-  - ingress.yaml
+- configmap.yaml
+- db-deployment.yaml
+- db-init-job.yaml
+- api-deployment.yaml
+- api-service.yaml
+- web-deployment.yaml
+- ingress.yaml
 
 images:
-  - name: harbourline/api
-    newTag: v9
-  - name: harbourline/web
-    newTag: k8s
+- name: harbourline/api
+  newName: ghcr.io/rkhnania/harbourline-api
+  newTag: 2cb5702
+- name: harbourline/web
+  newTag: k8s
 
 labels:
-  - pairs:
-      app.kubernetes.io/part-of: harbourline
-    includeSelectors: false
+- pairs:
+    app.kubernetes.io/part-of: harbourline
