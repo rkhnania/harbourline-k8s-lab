@@ -12,6 +12,8 @@ spec:
       labels:
         app: harbourline-web
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: web
           image: harbourline/web:k8s
