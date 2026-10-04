@@ -75,3 +75,23 @@ On a kind cluster, ignore the "1 node(s) had untolerated taint(s)" line — that
 the control plane. Read what the WORKER nodes say.
 Compare against allocatable:
     kubectl describe node <node> | grep -A8 Allocatable
+
+## Pending has two families
+
+Check `PodScheduled` in `kubectl describe pod` first — it splits the problem in half.
+
+| Evidence | Who is stuck | Where to look |
+|---|---|---|
+| `PodScheduled: False` + `FailedScheduling` events | scheduler, cannot place it | capacity, nodeSelector/affinity, taints, unbound PVC |
+| `PodScheduled: True`, no container events at all | kubelet, placed but never started | kubelet on that node, `crictl pods` on the node, Node-authorizer errors |
+
+The second one is quiet — no events, no logs, nothing in `describe` but a lone
+`Scheduled` line. Go to the node:
+
+    docker exec <node> crictl pods --name <pod-prefix>
+    docker exec <node> journalctl -u kubelet --since "10 min ago" --no-pager | tail -40
+
+`kubectl logs` on any Pending pod returns `pods/log not found` — no container has
+started, so there is no log endpoint. Not a permissions problem.
+
+See docs/etcd-restore.md gotcha 3 for the case that produced this.
