@@ -8,6 +8,13 @@ spec:
     - host: harbourline.localtest.me
       http:
         paths:
+          - path: /reports
+            pathType: Prefix
+            backend:
+              service:
+                name: harbourline-reports
+                port:
+                  number: 8080
           - path: /
             pathType: Prefix
             backend:
