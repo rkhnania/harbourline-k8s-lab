@@ -17,13 +17,13 @@ resources:
 images:
 - name: harbourline/api
   newName: ghcr.io/rkhnania/harbourline-api
-  newTag: b8bb365
-- name: harbourline/web
-  newName: ghcr.io/rkhnania/harbourline-web
-  newTag: b8bb365
+  newTag: 161f44d
 - name: harbourline/reports
   newName: ghcr.io/rkhnania/harbourline-reports
-  newTag: bootstrap
+  newTag: 161f44d
+- name: harbourline/web
+  newName: ghcr.io/rkhnania/harbourline-web
+  newTag: 161f44d
 
 labels:
 - pairs:
