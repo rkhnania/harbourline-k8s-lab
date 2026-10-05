@@ -10,6 +10,8 @@ resources:
 - api-deployment.yaml
 - api-service.yaml
 - web-deployment.yaml
+- reports-deployment.yaml
+- reports-service.yaml
 - ingress.yaml
 
 images:
@@ -19,6 +21,9 @@ images:
 - name: harbourline/web
   newName: ghcr.io/rkhnania/harbourline-web
   newTag: b8bb365
+- name: harbourline/reports
+  newName: ghcr.io/rkhnania/harbourline-reports
+  newTag: bootstrap
 
 labels:
 - pairs:

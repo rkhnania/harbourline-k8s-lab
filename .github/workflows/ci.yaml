@@ -6,6 +6,7 @@ on:
     paths:
       - 'api/**'
       - 'web/**'
+      - 'reports/**'
       - '.github/workflows/ci.yaml'
   workflow_dispatch:
 
@@ -19,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [api, web]
+        component: [api, web, reports]
     steps:
       - uses: actions/checkout@v4
 
@@ -73,9 +74,10 @@ jobs:
           cd k8s/base
           kustomize edit set image harbourline/api=ghcr.io/${OWNER}/harbourline-api:${TAG}
           kustomize edit set image harbourline/web=ghcr.io/${OWNER}/harbourline-web:${TAG}
+          kustomize edit set image harbourline/reports=ghcr.io/${OWNER}/harbourline-reports:${TAG}
           cd -
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add k8s/base/kustomization.yaml
-          git commit -m "ci: deploy harbourline api+web:${TAG}" || echo "no manifest change"
+          git commit -m "ci: deploy harbourline api+web+reports:${TAG}" || echo "no manifest change"
           git push
