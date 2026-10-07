@@ -57,8 +57,33 @@ jobs:
       - name: Push ${{ matrix.component }}
         run: docker push "${IMAGE}:${TAG}"
 
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Trivy filesystem scan (dependencies and secrets)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Trivy config scan (Dockerfiles and Kubernetes manifests)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: .
+          format: table
+          severity: CRITICAL,HIGH,MEDIUM
+          exit-code: '0'
+
   deploy:
-    needs: build
+    needs: [build, scan]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
