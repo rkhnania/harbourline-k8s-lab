@@ -1,0 +1,8 @@
+# Accepted security exceptions. See docs/security-decisions.md for rationale.
+# Review date: 2027-01-07
+
+# readOnlyRootFilesystem on PostgreSQL.
+# The database writes its unix socket and scratch files outside the data
+# volume. Achievable with additional emptyDir mounts but low value on a
+# single-tenant stateful workload whose data volume is writable regardless.
+KSV-0014
