@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: harbourline-reports
 spec:
-  replicas: 2
+  replicas: 10
   selector:
     matchLabels:
       app: harbourline-reports
