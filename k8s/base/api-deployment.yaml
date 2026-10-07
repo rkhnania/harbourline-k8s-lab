@@ -16,16 +16,35 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr-pull
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: tmp
+          emptyDir: {}
       containers:
         - name: api
           image: harbourline/api:v9
           ports:
             - containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           envFrom:
             - configMapRef:
                 name: harbourline-config
             - secretRef:
                 name: harbourline-db-secret
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
           livenessProbe:
             httpGet:
               path: /health
