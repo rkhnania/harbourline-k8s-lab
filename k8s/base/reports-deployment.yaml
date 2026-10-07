@@ -4,6 +4,11 @@ metadata:
   name: harbourline-reports
 spec:
   replicas: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: harbourline-reports

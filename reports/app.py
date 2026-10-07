@@ -16,7 +16,7 @@ CONNINFO = (f"host={DB_HOST} port={DB_PORT} user={DB_USER} "
 
 @app.route("/health")
 def health():
-    return jsonify(status="ok", host=socket.gethostname(), env=ENVIRONMENT)
+    return jsonify(status="ok", host=socket.gethostname(), env=ENVIRONMENT, version="2.0")
 
 
 @app.route("/reports/summary")
