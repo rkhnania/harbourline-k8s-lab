@@ -7,18 +7,9 @@ resources:
 - configmap.yaml
 - db-deployment.yaml
 - db-init-job.yaml
-- api-deployment.yaml
-- api-service.yaml
-- web-deployment.yaml
 - ingress.yaml
 
 images:
-- name: harbourline/api
-  newName: ghcr.io/rkhnania/harbourline-api
-  newTag: 6c93d18
-- name: harbourline/web
-  newName: ghcr.io/rkhnania/harbourline-web
-  newTag: 6c93d18
 
 labels:
 - pairs:

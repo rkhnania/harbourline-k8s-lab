@@ -91,20 +91,13 @@ jobs:
       - name: Set tag
         run: echo "TAG=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
-      - name: Update image tags in the manifest
+      - name: Update image tags in the Helm values
         run: |
-          curl -sfL https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh | bash
-          sudo mv kustomize /usr/local/bin/
-          OWNER=${{ github.repository_owner }}
-          cd k8s/base
-          kustomize edit set image harbourline/api=ghcr.io/${OWNER}/harbourline-api:${TAG}
-          kustomize edit set image harbourline/web=ghcr.io/${OWNER}/harbourline-web:${TAG}
-          cd -
-          sed -i "s|^  tag: .*|  tag: \"${TAG}\"|" helm/harbourline/values-reports.yaml
-          cd k8s/base
-          cd -
+          for svc in api web reports; do
+            sed -i "s|^  tag: .*|  tag: \"${TAG}\"|" helm/harbourline/values-$svc.yaml
+          done
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/base/kustomization.yaml helm/harbourline/values-reports.yaml
+          git add helm/harbourline/values-api.yaml helm/harbourline/values-web.yaml helm/harbourline/values-reports.yaml
           git commit -m "ci: deploy harbourline api+web+reports:${TAG}" || echo "no manifest change"
           git push
