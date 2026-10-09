@@ -1,0 +1,22 @@
+name: harbourline-reports
+containerName: reports
+replicaCount: 2
+
+image:
+  repository: ghcr.io/rkhnania/harbourline-reports
+  tag: "4507aa1"
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 2
+    maxUnavailable: 0
+
+env:
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: harbourline-db-secret
+        key: DB_PASSWORD
+  - name: PYTHONDONTWRITEBYTECODE
+    value: "1"

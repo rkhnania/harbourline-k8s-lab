@@ -1,0 +1,42 @@
+name: harbourline-api
+extraLabels:
+  app: harbourline-api
+containerName: api
+replicaCount: 3
+
+image:
+  repository: ghcr.io/rkhnania/harbourline-api
+  tag: "4507aa1"
+
+envFrom:
+  - configMapRef:
+      name: harbourline-config
+  - secretRef:
+      name: harbourline-db-secret
+
+env:
+  - name: PYTHONDONTWRITEBYTECODE
+    value: "1"
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  periodSeconds: 5
+  failureThreshold: 2
+  initialDelaySeconds: 0
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  periodSeconds: 10
+  failureThreshold: 3
+  initialDelaySeconds: 0
+
+startupProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  periodSeconds: 3
+  failureThreshold: 20

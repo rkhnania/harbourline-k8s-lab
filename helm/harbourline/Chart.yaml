@@ -1,0 +1,6 @@
+apiVersion: v2
+name: harbourline
+description: A generic chart for Harbourline application services
+type: application
+version: 0.1.0
+appVersion: "1.0"
