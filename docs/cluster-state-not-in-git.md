@@ -46,3 +46,17 @@ Snapshots taken BEFORE this change are still plaintext credential dumps.
 
 Installed via Helm into ns `headlamp`, plus the hl-viewer ServiceAccount and its
 `view` ClusterRoleBinding.
+
+## 5. PersistentVolume reclaim policy
+
+The PV backing the database was patched from Delete to Retain by hand during
+the StatefulSet migration:
+
+    kubectl patch pv <name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+
+PVs are cluster-scoped and not created by any manifest here (the StorageClass
+provisions them), so this cannot live in Git. On a rebuilt cluster the new PV
+will default to Delete again. Check it before any PVC surgery.
+
+Also note the StatefulSet's PVC (pgdata-harbourline-db-0) is generated from
+volumeClaimTemplates and is deliberately NOT deleted when the StatefulSet is.
