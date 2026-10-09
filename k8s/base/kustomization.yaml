@@ -10,16 +10,11 @@ resources:
 - api-deployment.yaml
 - api-service.yaml
 - web-deployment.yaml
-- reports-deployment.yaml
-- reports-service.yaml
 - ingress.yaml
 
 images:
 - name: harbourline/api
   newName: ghcr.io/rkhnania/harbourline-api
-  newTag: 4507aa1
-- name: harbourline/reports
-  newName: ghcr.io/rkhnania/harbourline-reports
   newTag: 4507aa1
 - name: harbourline/web
   newName: ghcr.io/rkhnania/harbourline-web
