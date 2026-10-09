@@ -5,7 +5,6 @@ namespace: harbourline
 
 resources:
 - configmap.yaml
-- db-deployment.yaml
 - db-init-job.yaml
 - ingress.yaml
 
