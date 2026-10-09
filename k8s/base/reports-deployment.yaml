@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: harbourline-reports
 spec:
-  replicas: 10
+  replicas: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
