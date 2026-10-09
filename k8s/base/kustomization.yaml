@@ -15,10 +15,10 @@ resources:
 images:
 - name: harbourline/api
   newName: ghcr.io/rkhnania/harbourline-api
-  newTag: 4507aa1
+  newTag: 6c93d18
 - name: harbourline/web
   newName: ghcr.io/rkhnania/harbourline-web
-  newTag: 4507aa1
+  newTag: 6c93d18
 
 labels:
 - pairs:
