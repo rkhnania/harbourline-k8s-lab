@@ -20,3 +20,8 @@ env:
         key: DB_PASSWORD
   - name: PYTHONDONTWRITEBYTECODE
     value: "1"
+
+hpa:
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPU: 50
