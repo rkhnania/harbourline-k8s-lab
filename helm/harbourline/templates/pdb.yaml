@@ -1,0 +1,13 @@
+{{- if .Values.pdb }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Values.partOf }}
+spec:
+  {{- toYaml .Values.pdb | nindent 2 }}
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+{{- end }}

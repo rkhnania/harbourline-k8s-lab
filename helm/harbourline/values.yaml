@@ -65,3 +65,12 @@ volumes:
 volumeMounts:
   - name: tmp
     mountPath: /tmp
+
+spread:
+  enabled: true
+  maxSkew: 1
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: DoNotSchedule
+
+pdb:
+  maxUnavailable: 1

@@ -24,6 +24,15 @@ spec:
     spec:
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
+      {{- if .Values.spread.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ .Values.spread.maxSkew }}
+          topologyKey: {{ .Values.spread.topologyKey }}
+          whenUnsatisfiable: {{ .Values.spread.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              app: {{ .Values.name }}
+      {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       {{- with .Values.volumes }}
