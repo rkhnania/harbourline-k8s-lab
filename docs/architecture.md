@@ -1,46 +1,77 @@
-# Architecture
+# 🏗️ Architecture
 
-## Runtime topology
+## ☸️ Runtime topology
 
-Generated from the live cluster with `tools/kubectl-topology`:
+Generated from the **live cluster** by [`tools/kubectl-topology`](../tools/kubectl-topology) — a kubectl plugin that matches Service selectors against pod-template labels, so every edge shown is one the cluster itself would route.
 
 ```mermaid
 flowchart LR
-  client([Internet])
-  ing_harbourline[["Ingress harbourline.localtest.me"]]
-  client --> ing_harbourline
-  ing_harbourline -->|"/reports"| svc_harbourline_reports
+  internet(["🌐 Internet"])
+
+  subgraph ns["☸️  namespace: harbourline"]
+    direction LR
+    ing_harbourline[["🚪 Ingress<br/>harbourline.localtest.me"]]
+    svc_harbourline_api(["🔀 harbourline-api<br/>:8080"])
+    wl_harbourline_api["🚀 harbourline-api<br/>Deployment<br/>🟢 3/3 ready"]
+    svc_harbourline_db(["🧭 harbourline-db<br/>:5432<br/><i>headless</i>"])
+    wl_harbourline_db["🗄️ harbourline-db<br/>StatefulSet<br/>🟢 1/1 ready"]
+    svc_harbourline_reports(["🔀 harbourline-reports<br/>:8080"])
+    wl_harbourline_reports["🚀 harbourline-reports<br/>Deployment<br/>🟢 2/2 ready"]
+    svc_harbourline_web(["🔀 harbourline-web<br/>:80"])
+    wl_harbourline_web["🚀 harbourline-web<br/>Deployment<br/>🟢 2/2 ready"]
+  end
+
   ing_harbourline -->|"/"| svc_harbourline_web
-  svc_harbourline_api(["Svc harbourline-api:8080"])
-  wl_harbourline_api["Deployment harbourline-api<br/>3/3 ready"]
+  ing_harbourline -->|"/reports"| svc_harbourline_reports
+  internet ==> ing_harbourline
   svc_harbourline_api --> wl_harbourline_api
-  svc_harbourline_db(["Svc harbourline-db:5432 (headless)"])
-  wl_harbourline_db["StatefulSet harbourline-db<br/>1/1 ready"]
   svc_harbourline_db --> wl_harbourline_db
-  svc_harbourline_reports(["Svc harbourline-reports:8080"])
-  wl_harbourline_reports["Deployment harbourline-reports<br/>2/2 ready"]
   svc_harbourline_reports --> wl_harbourline_reports
-  svc_harbourline_web(["Svc harbourline-web:80"])
-  wl_harbourline_web["Deployment harbourline-web<br/>2/2 ready"]
   svc_harbourline_web --> wl_harbourline_web
+
+  classDef ing  fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
+  classDef svc  fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+  classDef hsvc fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#4c1d95
+  classDef wl   fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+  classDef sts  fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337
+  class ing_harbourline ing
+  class svc_harbourline_api,svc_harbourline_reports,svc_harbourline_web svc
+  class svc_harbourline_db hsvc
+  class wl_harbourline_api,wl_harbourline_reports,wl_harbourline_web wl
+  class wl_harbourline_db sts
 ```
 
-> Service-to-service edges (web -> api, api -> db) are deliberately absent.
-> They exist in nginx.conf and the ConfigMap, not in any Kubernetes object,
-> so the API server cannot report them.
+> ⚠️ **What this diagram cannot show.** There are no `web → api` or `api → db` edges, because those dependencies live in `nginx.conf` and a ConfigMap — not in any Kubernetes object. The API server does not know they exist. Observing them needs eBPF tooling or a service mesh.
 
-## Delivery pipeline
+## 🚚 Delivery pipeline
 
 ```mermaid
 flowchart LR
-  dev([Developer]) -->|push| gh[GitHub]
-  gh --> build[CI: buildx matrix<br/>api, web, reports]
-  gh --> scan[CI: Trivy<br/>fs, config, image]
-  build -->|push image| ghcr[(GHCR)]
-  build --> deploy[CI: bump tag in<br/>helm values]
-  scan --> deploy
-  deploy -->|commit| gh
-  gh -->|poll| argo[Argo CD]
-  argo -->|apply| k8s[kind cluster]
-  ghcr -->|imagePullSecret| k8s
+  dev(["👩‍💻 Developer"]) ==>|git push| gh
+  subgraph ci["⚙️ GitHub Actions"]
+    direction TB
+    build["🔨 Build matrix<br/>api · web · reports"]
+    scan["🛡️ Trivy<br/>image · fs · config"]
+    bump["🏷️ Bump tags in<br/>helm values"]
+    build --> bump
+    scan --> bump
+  end
+  gh[("🐙 GitHub<br/>main")] --> build
+  gh --> scan
+  build -->|push image| ghcr[("📦 GHCR")]
+  bump ==>|commit| gh
+  gh ==>|poll / webhook| argo{{"🐙 Argo CD"}}
+  argo ==>|apply| k8s["☸️ kind cluster<br/>harbourline"]
+  ghcr -.->|imagePullSecret| k8s
+
+  classDef src fill:#e0e7ff,stroke:#4f46e5,stroke-width:2px,color:#312e81
+  classDef sec fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+  classDef art fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
+  classDef run fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d
+  class dev,gh src
+  class scan sec
+  class ghcr,bump,build art
+  class argo,k8s run
 ```
+
+**No cluster credentials exist in CI.** The pipeline only ever writes to Git; Argo CD pulls. That is the security property GitOps buys you.
