@@ -95,3 +95,29 @@ The second one is quiet — no events, no logs, nothing in `describe` but a lone
 started, so there is no log endpoint. Not a permissions problem.
 
 See docs/etcd-restore.md gotcha 3 for the case that produced this.
+
+## Pod placement: spread vs PDB
+
+| | topologySpreadConstraints | PodDisruptionBudget |
+|---|---|---|
+| Acts on | the scheduler, at placement time | the eviction API, during voluntary disruption |
+| Prevents | replicas piling onto one node | too many going down at once in a drain/upgrade |
+| Helps when a node dies? | no | no (that is involuntary) |
+
+Gotchas proven in this cluster:
+
+- `whenUnsatisfiable: DoNotSchedule` is a HARD constraint. Without
+  `nodeTaintsPolicy: Honor`, a tainted control-plane node counts as an empty
+  topology domain the scheduler must balance against, and every pod beyond
+  one-per-worker stays Pending. Symptom:
+  "N node(s) didn't match pod topology spread constraints".
+- Spread does NOT survive a drain. Cordon adds a NoSchedule taint, `Honor`
+  then drops that node as a domain, so everything legally consolidates onto
+  what remains.
+- NOTHING rebalances afterwards. `kubectl rollout restart` does not fix it
+  either, because new pods are scheduled while the old ones are still running
+  and still counted. Rebalance by deleting pods ONE AT A TIME once the
+  rollout has settled, or install the descheduler.
+- `kubectl get pdb` shows ALLOWED DISRUPTIONS. 0 there is what makes a drain
+  hang. `minAvailable` equal to the replica count means no voluntary
+  disruption is ever permitted.
