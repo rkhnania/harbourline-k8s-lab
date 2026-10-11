@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Emit a Mermaid topology diagram for a namespace, from live cluster state."""
+import json, subprocess, sys, argparse
+
+def sanitise(name):
+    return name.replace("-", "_").replace(".", "_")
+
+def kget(ns, kinds):
+    out = subprocess.run(
+        ["kubectl", "get", kinds, "-n", ns, "-o", "json"],
+        capture_output=True, text=True, check=True).stdout
+    return json.loads(out).get("items", [])
+
+def main():
+    ap = argparse.ArgumentParser(prog="kubectl topology")
+    ap.add_argument("-n", "--namespace", default="default")
+    args = ap.parse_args()
+    ns = args.namespace
+
+    items = kget(ns, "ingress,service,deployment,statefulset")
+    ingresses = [i for i in items if i["kind"] == "Ingress"]
+    services  = [i for i in items if i["kind"] == "Service"]
+    workloads = [i for i in items if i["kind"] in ("Deployment", "StatefulSet")]
+
+    lines = ["flowchart LR", "  client([Internet])"]
+
+    # Ingress -> Service
+    for ing in ingresses:
+        iid = "ing_" + sanitise(ing["metadata"]["name"])
+        hosts = [r.get("host", "*") for r in ing["spec"].get("rules", [])]
+        lines.append('  %s[["Ingress %s"]]' % (iid, ", ".join(hosts)))
+        lines.append("  client --> %s" % iid)
+        for rule in ing["spec"].get("rules", []):
+            for path in rule.get("http", {}).get("paths", []):
+                svc = path["backend"]["service"]["name"]
+                lines.append('  %s -->|"%s"| svc_%s' % (iid, path.get("path", "/"), sanitise(svc)))
+
+    # Service -> workload, matched by selector
+    for svc in services:
+        sel = svc["spec"].get("selector") or {}
+        sid = "svc_" + sanitise(svc["metadata"]["name"])
+        ports = ",".join(str(p.get("port")) for p in svc["spec"].get("ports", []))
+        headless = svc["spec"].get("clusterIP") == "None"
+        label = "Svc %s:%s%s" % (svc["metadata"]["name"], ports, " (headless)" if headless else "")
+        lines.append('  %s(["%s"])' % (sid, label))
+        for wl in workloads:
+            wlabels = wl["spec"]["template"]["metadata"].get("labels", {})
+            if sel and all(wlabels.get(k) == v for k, v in sel.items()):
+                wid = "wl_" + sanitise(wl["metadata"]["name"])
+                ready = wl["status"].get("readyReplicas", 0)
+                want = wl["spec"].get("replicas", 0)
+                lines.append('  %s["%s %s<br/>%s/%s ready"]'
+                             % (wid, wl["kind"], wl["metadata"]["name"], ready, want))
+                lines.append("  %s --> %s" % (sid, wid))
+
+    print("\n".join(lines))
+
+if __name__ == "__main__":
+    main()
