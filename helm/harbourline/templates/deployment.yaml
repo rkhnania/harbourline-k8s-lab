@@ -8,7 +8,9 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
+  {{- if not .Values.hpa }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   {{- with .Values.strategy }}
   strategy:
     {{- toYaml . | nindent 4 }}
