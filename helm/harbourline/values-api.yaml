@@ -6,7 +6,7 @@ replicaCount: 3
 
 image:
   repository: ghcr.io/rkhnania/harbourline-api
-  tag: "fef7d88"
+  tag: "a551386"
 
 envFrom:
   - configMapRef:
