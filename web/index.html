@@ -1,24 +1,117 @@
 <!doctype html>
-<html>
-<head><meta charset="utf-8"><title>Harbourline Tracking</title>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harbourline — Shipment Tracking</title>
 <style>
-body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 16px}
-table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:8px;text-align:left}
-#host{color:#666;font-size:14px}
-</style></head>
+  :root{
+    --bg:#f5f7fa; --card:#fff; --ink:#0f172a; --muted:#64748b;
+    --line:#e2e8f0; --brand:#0d9488; --brand2:#0369a1;
+    --transit:#0369a1; --transitbg:#e0f2fe;
+    --delayed:#b45309; --delayedbg:#fef3c7;
+    --hold:#be123c;    --holdbg:#ffe4e6;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#0b1220; --card:#121c2e; --ink:#e8eefc; --muted:#94a3b8; --line:#1e2b45;
+           --transitbg:#0c2a40; --delayedbg:#3a2a08; --holdbg:#3d1020; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{background:linear-gradient(120deg,var(--brand2),var(--brand));color:#fff;
+         padding:26px 20px;box-shadow:0 2px 14px rgba(0,0,0,.18)}
+  .bar{max-width:1000px;margin:0 auto;display:flex;align-items:center;gap:14px}
+  .bar h1{margin:0;font-size:1.45rem;letter-spacing:-.02em}
+  .bar p{margin:2px 0 0;opacity:.85;font-size:.85rem}
+  main{max-width:1000px;margin:0 auto;padding:22px 20px 60px}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .tile .n{font-size:2rem;font-weight:700;line-height:1}
+  .tile .l{color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:.75rem;letter-spacing:.07em;text-transform:uppercase;
+     color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--line)}
+  td{padding:13px 16px;border-bottom:1px solid var(--line)}
+  tr:last-child td{border-bottom:0}
+  tr:hover td{background:rgba(125,125,125,.06)}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;
+        font-size:.78rem;font-weight:600}
+  .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+  .s-in-transit{color:var(--transit);background:var(--transitbg)}
+  .s-delayed{color:var(--delayed);background:var(--delayedbg)}
+  .s-customs-hold{color:var(--hold);background:var(--holdbg)}
+  footer{max-width:1000px;margin:18px auto 0;padding:0 20px;color:var(--muted);font-size:.8rem}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px}
+</style>
+</head>
 <body>
-<h1>Harbourline Shipment Tracking</h1>
-<p id="host">Loading...</p>
-<table><thead><tr><th>ID</th><th>Origin</th><th>Destination</th><th>Status</th></tr></thead>
-<tbody id="rows"></tbody></table>
+<header>
+  <div class="bar">
+    <svg width="46" height="46" viewBox="0 0 64 64" role="img" aria-label="Harbourline logo">
+      <circle cx="32" cy="32" r="30" fill="rgba(255,255,255,.14)"/>
+      <path d="M32 11v30" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="32" cy="16" r="5" fill="none" stroke="#fff" stroke-width="4"/>
+      <path d="M17 33a15 15 0 0 0 30 0" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+      <path d="M22 26h20" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+      <path d="M8 52c5 0 5-4 10-4s5 4 10 4 5-4 10-4 5 4 10 4 5-4 8-4"
+            fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" opacity=".85"/>
+    </svg>
+    <div>
+      <h1>Harbourline</h1>
+      <p>Shipment Tracking</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="tiles" id="tiles"></div>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Shipment</th><th>Origin</th><th>Destination</th><th>Status</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="4" style="color:var(--muted)">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <footer id="foot"></footer>
+</main>
+
 <script>
-fetch('/api/health').then(r=>r.json()).then(d=>{
-  document.getElementById('host').textContent='Served by API container '+d.host+' ('+d.env+')';
-});
-fetch('/api/shipments').then(r=>r.json()).then(data=>{
-  document.getElementById('rows').innerHTML=Object.entries(data).map(([id,s])=>
-    '<tr><td>'+id+'</td><td>'+s.origin+'</td><td>'+s.destination+'</td><td>'+s.status+'</td></tr>').join('');
-});
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const label = s => s.replace(/-/g,' ').replace(/\b\w/g, m => m.toUpperCase());
+
+async function load(){
+  try{
+    const ship = await (await fetch('/api/shipments')).json();
+    const rows = Object.entries(ship).map(([id,s]) => `<tr>
+        <td><code>${esc(id)}</code></td>
+        <td>${esc(s.origin)}</td>
+        <td>${esc(s.destination)}</td>
+        <td><span class="pill s-${esc(s.status)}">${esc(label(s.status))}</span></td>
+      </tr>`).join('');
+    document.getElementById('rows').innerHTML = rows ||
+      '<tr><td colspan="4" style="color:var(--muted)">No shipments</td></tr>';
+
+    const counts = {};
+    Object.values(ship).forEach(s => counts[s.status] = (counts[s.status]||0)+1);
+    const tiles = [['Total', Object.keys(ship).length]]
+      .concat(Object.entries(counts).map(([k,v]) => [label(k), v]));
+    document.getElementById('tiles').innerHTML = tiles
+      .map(([l,n]) => `<div class="tile"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`)
+      .join('');
+  }catch(e){
+    document.getElementById('rows').innerHTML =
+      '<tr><td colspan="4" style="color:#be123c">Could not reach the API</td></tr>';
+  }
+  try{
+    const h = await (await fetch('/api/health')).json();
+    document.getElementById('foot').innerHTML =
+      `<span class="dot"></span>Served by <code>${esc(h.host)}</code> · environment <code>${esc(h.env)}</code>`;
+  }catch(e){}
+}
+load();
+setInterval(load, 15000);
 </script>
 </body>
 </html>

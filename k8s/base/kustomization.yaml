@@ -8,6 +8,7 @@ resources:
 - db-statefulset.yaml
 - db-init-job.yaml
 - ingress.yaml
+- networkpolicies.yaml
 
 images:
 

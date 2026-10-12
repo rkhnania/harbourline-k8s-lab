@@ -1,0 +1,95 @@
+# 1. Nothing may reach any pod in this namespace unless a later policy allows it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# 2. The ingress controller may reach web.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-web
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-web
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# 3. The ingress controller may reach reports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-reports
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-reports
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# 4. Only web may reach api (the /api path is proxied by web's nginx).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-api
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: harbourline-web
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# 5. Only api, reports and the seed job may reach the database.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-app-to-db
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: harbourline-api
+        - podSelector:
+            matchLabels:
+              app: harbourline-reports
+        - podSelector:
+            matchLabels:
+              job-name: harbourline-db-init
+      ports:
+        - protocol: TCP
+          port: 5432
