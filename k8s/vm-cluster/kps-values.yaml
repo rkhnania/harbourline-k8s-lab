@@ -1,0 +1,45 @@
+# kube-prometheus-stack values for the Harbourline VM cluster (kubeadm, 3 nodes).
+#
+# Install:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm install kps prometheus-community/kube-prometheus-stack \
+#     -n monitoring --create-namespace \
+#     -f k8s/vm-cluster/kps-values.yaml \
+#     --set grafana.adminPassword='<password>' \
+#     --timeout 10m
+#
+# The admin password is deliberately NOT in this file - pass it with --set,
+# or move it to a Secret once External Secrets Operator is in place.
+
+grafana:
+  # Exposed by MetalLB from the 192.168.0.240-.250 pool.
+  service:
+    type: LoadBalancer
+  persistence:
+    enabled: true
+    storageClassName: longhorn-2
+    size: 5Gi
+
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn-2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              # longhorn-2 keeps 2 replicas, so this consumes 20Gi of the 78Gi pool.
+              storage: 10Gi
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: longhorn-2
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi

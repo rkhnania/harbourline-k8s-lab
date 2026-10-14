@@ -88,3 +88,14 @@ on the next boot: **reset the VM, wait ~3 seconds, reset again**. Then
 - Ubuntu's `containerd` package ships with the CRI plugin **disabled**, failing
   kubeadm preflight. The prep script regenerates `config.toml` and sets
   `SystemdCgroup = true`.
+
+## Diagrams
+
+**[Harbourline VM Cluster board (Miro)](https://miro.com/app/board/uXjVEaGZDfM=/)** - four sections:
+
+1. Physical host to Kubernetes - the Hyper-V switch, the three VMs, what runs on each
+2. MetalLB L2 - how a request reaches a pod, including the ARP election
+3. Longhorn - one volume, two replicas, and what a node failure does
+4. LAN address plan - 192.168.0.0/24 split between DHCP, the nodes and MetalLB
+
+See also [monitoring.md](monitoring.md).
