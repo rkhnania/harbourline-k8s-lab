@@ -1,0 +1,24 @@
+# MetalLB address pool for the Hyper-V cluster.
+# The LAN is 192.168.0.0/24; the router's DHCP pool was shrunk to .2-.199,
+# reserving .200-.254 for infrastructure. .201-.203 are the nodes.
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: lan-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - 192.168.0.240-192.168.0.250
+---
+# Without an advertisement the pool allocates addresses that nobody can reach.
+# L2 mode: one speaker wins an election and answers ARP for each service IP.
+# Failover works; ingress throughput is capped at one node's NIC. BGP is the
+# datacentre answer, but it needs a router we don't control.
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: lan-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - lan-pool
