@@ -1,5 +1,8 @@
 # Harbourline — Architecture
 
+> This document describes the **kind** cluster. The second cluster — three Hyper-V VMs built with kubeadm, running Cilium, MetalLB and Longhorn — is documented in [docs/vm-cluster.md](vm-cluster.md).
+
+
 Shipment-tracking lab application. Three services plus a database, on a 3-node
 `kind` cluster (one control plane, two workers), deployed entirely through GitOps.
 

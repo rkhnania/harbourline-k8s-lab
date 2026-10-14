@@ -1,5 +1,15 @@
 # Bare-metal-style Kubernetes cluster (Hyper-V)
 
+## Diagrams
+
+**[Harbourline VM Cluster board](https://miro.com/app/board/uXjVEaGZDfM=/)** — four sections:
+
+1. Physical host to Kubernetes — Hyper-V switch, the three VMs, what runs on each
+2. MetalLB L2 — how a request reaches a pod, including the ARP election
+3. Longhorn — one volume, two replicas, and what a node failure does
+4. LAN address plan — 192.168.0.0/24 carved between DHCP, nodes and MetalLB
+
+
 A second cluster, built with `kubeadm` on three Ubuntu VMs, separate from the
 `kind` cluster that runs the Harbourline app. This one exists because Longhorn
 needs real nodes — it is distributed block storage over iSCSI and requires the
