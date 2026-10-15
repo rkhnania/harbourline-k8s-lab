@@ -1,0 +1,94 @@
+# eksctl ClusterConfig for the Harbourline EKS lab.
+#
+#   eksctl create cluster -f k8s/eks/cluster.yaml
+#   eksctl delete  cluster -f k8s/eks/cluster.yaml --disable-nodegroup-eviction
+#
+# COST: this configuration bills roughly $0.21/hour while it exists -
+#   EKS control plane   $0.10/hr   (charged whether or not anything runs on it)
+#   2 x t3.medium       ~$0.11/hr
+#   NAT gateway         $0.00      (deliberately disabled - see vpc.nat below)
+# About $5/day if left running. Deleting the cluster is the last step of every
+# session, and the deletion is VERIFIED, not assumed.
+
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: harbourline
+  region: ap-southeast-2        # Sydney
+  # 1.36 is the AWS default. 1.37 exists but is two weeks old, which is where
+  # addon compatibility bugs live. EKS lags upstream Kubernetes by design.
+  version: "1.36"
+  tags:
+    project: harbourline
+    owner: ramsin
+    environment: lab
+    managed-by: eksctl
+
+# Creates an IAM OIDC provider for the cluster. This is what makes IRSA
+# (IAM Roles for Service Accounts) possible: a Kubernetes ServiceAccount token
+# becomes a credential AWS will trust, so pods get IAM permissions without any
+# access key existing anywhere. Required by the EBS CSI driver below.
+iam:
+  withOIDC: true
+
+vpc:
+  # Deliberately not 192.168.x - that is the home LAN the VM cluster lives on,
+  # and overlapping CIDRs make future VPN or peering impossible.
+  cidr: 10.20.0.0/16
+
+  nat:
+    # Disable | Single | HighlyAvailable
+    #
+    # A NAT gateway costs ~$0.06/hour plus data transfer, forever, used or not.
+    # It is the single most commonly forgotten AWS charge.
+    #
+    # Disabling it means nodes must live in PUBLIC subnets with public IPs to
+    # reach the internet (pulling images, talking to the EKS API). Security
+    # groups still control what can reach them, but they are internet-routable.
+    #
+    # Production does the opposite: private nodes, NAT or VPC endpoints for
+    # egress. That is the correct topology and it costs about $1.40/day.
+    gateway: Disable
+
+  clusterEndpoints:
+    publicAccess: true          # kubectl from the laptop
+    privateAccess: true         # nodes reach the API without leaving the VPC
+
+managedNodeGroups:
+  - name: ng-default
+    # t3.medium: 2 vCPU, 4 GiB, and - the constraint people miss - a pod limit
+    # set by ENI capacity, not memory. t3.medium allows 17 pods; t3.small only
+    # 11, most of which the system addons consume.
+    instanceType: t3.medium
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 4
+    volumeSize: 20
+    volumeType: gp3
+    # Required because nat.gateway is Disable - private nodes with no NAT have
+    # no route to the internet and cannot even pull their own container images.
+    privateNetworking: false
+    labels:
+      role: worker
+    tags:
+      project: harbourline
+
+addons:
+  - name: vpc-cni               # pod networking - pods get real VPC IPs
+    version: latest
+  - name: coredns
+    version: latest
+  - name: kube-proxy
+    version: latest
+  - name: aws-ebs-csi-driver    # PersistentVolumes backed by EBS
+    version: latest
+    wellKnownPolicies:
+      ebsCSIController: true    # IRSA role, created via the OIDC provider above
+
+# Control plane logging is OFF on purpose. Audit logs in particular are chatty
+# and bill per GB ingested and stored in CloudWatch Logs. Turn api and audit on
+# deliberately when doing a security exercise, then turn them off again.
+# cloudWatch:
+#   clusterLogging:
+#     enableTypes: ["api", "audit", "authenticator"]
