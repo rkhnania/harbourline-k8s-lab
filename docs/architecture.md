@@ -10,6 +10,11 @@ Shipment-tracking lab application. Three services plus a database, on a 3-node
 - **Namespace:** `harbourline`
 - **Delivery:** GitHub Actions → GHCR → Argo CD (automated, prune, selfHeal)
 
+**[Interactive board (Miro)](https://miro.com/app/board/uXjVEZuyfiI=/)** — the
+five sections below as editable shapes: runtime topology, security boundaries,
+the NetworkPolicy inventory, the delivery pipeline, and availability controls.
+The VM cluster has its own board, linked from [vm-cluster.md](vm-cluster.md).
+
 ---
 
 ## 1. Runtime topology
