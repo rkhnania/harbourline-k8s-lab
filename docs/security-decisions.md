@@ -94,6 +94,35 @@ Two operational notes:
   admission outage. `Ignore` fails open instead and silently stops enforcing.
   Scope `match` blocks narrowly and run more than one replica.
 
+### Mutating policies fight GitOps
+
+Demonstrated deliberately on 2026-10-15. A mutating ClusterPolicy set
+`spec.replicas: 2` on `harbourline-api`, which the Helm chart declares as 3.
+
+Argo CD applies 3, the API server accepts the request, Kyverno rewrites it to 2
+before it is persisted, and the Application sits **`Sync OK` and `OutOfSync` at
+the same time** - both statements true. Nothing errors. The app stays Healthy.
+
+> Whatever mutates a field at runtime must own it, and Git must not declare it.
+
+The same rule as the HPA conflict of 2026-10-11, reached from the opposite
+direction: there an autoscaler owned `spec.replicas`, here an admission webhook
+did. Three resolutions, depending on why you are mutating:
+
+| Situation | Fix |
+|---|---|
+| Policy sets a field Git also declares | Do not. Pick one owner. |
+| Mutation required and Git must keep declaring it | Argo `ignoreDifferences` on that path |
+| Policy sets defaults on resources Git does not manage | Fine - that is what mutation is for |
+
+The third row is the legitimate use: injecting a default securityContext onto
+pods created by hand, cost-allocation labels, `imagePullSecrets`. Had such a
+policy existed, the `probe` pod would have been corrected rather than rejected.
+
+Forensics: Kyverno stamps every object it mutates with
+`policies.kyverno.io/last-applied-patches`, naming the policy and rule. When a
+field does not match Git and nobody knows why, that annotation is the trail.
+
 `kyverno.io/v1 ClusterPolicy` is deprecated as of v1.19 in favour of CEL-based
 `ValidatingPolicy` under `policies.kyverno.io`, aligning with upstream
 `ValidatingAdmissionPolicy`. The policy here still uses ClusterPolicy, which is
