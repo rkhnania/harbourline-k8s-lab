@@ -111,3 +111,30 @@ most often forgotten when sizing replicated storage.
 `kubectl top` reports the current **working set** as a percentage of
 **allocatable** - unrelated to the `requests` the scheduler uses. A node can
 read 20% here and still refuse to schedule a pod.
+
+## One Grafana, both clusters (2026-10-15)
+
+The kind cluster's Grafana is the hub. The VM cluster's Prometheus is added to it
+as a second datasource, `Prometheus-VM`:
+[`k8s/monitoring/vm-cluster-datasource.yaml`](../k8s/monitoring/vm-cluster-datasource.yaml).
+
+Each cluster keeps its own Prometheus - scraping is always local. Only the view
+is centralised.
+
+**The direction is forced, not chosen.** WSL2 is NAT'd: the kind cluster can
+reach `192.168.0.x`, but nothing on the LAN can reach into WSL. The hub has to
+be the kind side.
+
+Reachability was verified **from inside a pod**, not from WSL - that traffic goes
+kind container, Docker bridge, WSL2 NAT, LAN, which is a different path with a
+different answer. Had it failed, the datasource would have been added and
+silently never worked.
+
+Both clusters run the same node-exporter emitting the same metric names, so the
+stock Node Exporter dashboards render either cluster - just switch the datasource
+picker at the top.
+
+**Limit:** two datasources is not federation. You pick a cluster per dashboard;
+no query spans both. That needs Thanos or Grafana Mimir. Two datasources is the
+right answer at two clusters.
+
