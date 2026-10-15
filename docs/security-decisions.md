@@ -60,6 +60,45 @@ These were judged false positives for this environment and are not tracked:
 - **KSV-0013 no image tag** — an artefact of scanning the base rather than the
   rendered output; Kustomize sets the tag.
 
+## Enforced by Kyverno
+
+As of 2026-10-15 the decisions above are not only recorded here, they are an
+admission control: [`k8s/policies/harbourline-baseline.yaml`](../k8s/policies/harbourline-baseline.yaml).
+
+Four rules, all `failureAction: Enforce`, scoped to the `harbourline` namespace:
+runAsNonRoot, allowPrivilegeEscalation, seccompProfile RuntimeDefault, and
+readOnlyRootFilesystem - the last carrying the PostgreSQL exception below as an
+explicit `exclude` block, so the accepted risk is a named object rather than a
+paragraph someone has to remember.
+
+Policies were installed in **Audit** first and the PolicyReport read before
+anything was switched to Enforce. The result on the running cluster:
+
+| Pod | Pass | Fail |
+|---|---|---|
+| api, web, reports (all replicas) | 4 | 0 |
+| `harbourline-db-0` | 3 | 0 (one rule excluded by design) |
+| `probe` - created by hand, never in Git | **0** | **4** |
+
+Everything the pipeline creates was already compliant. The only violation was a
+debug pod typed at a terminal during the NetworkPolicy work. That is the case
+for admission control in one line: documents do not stop the second kind.
+
+Two operational notes:
+
+- Admission control has no power over objects already persisted. Switching to
+  Enforce did not evict `probe`; it only blocks new requests.
+- Enforce rules attach to the `validate.kyverno.svc-fail` webhook
+  (`failurePolicy: Fail`). **If Kyverno is unavailable, every create and update
+  of a matched resource is rejected** - an unavailable policy engine becomes an
+  admission outage. `Ignore` fails open instead and silently stops enforcing.
+  Scope `match` blocks narrowly and run more than one replica.
+
+`kyverno.io/v1 ClusterPolicy` is deprecated as of v1.19 in favour of CEL-based
+`ValidatingPolicy` under `policies.kyverno.io`, aligning with upstream
+`ValidatingAdmissionPolicy`. The policy here still uses ClusterPolicy, which is
+what the ecosystem overwhelmingly runs today.
+
 ## Known gaps, not yet addressed
 
 - The `fs` scan (dependency CVEs and secrets) is still report-only.
@@ -70,5 +109,5 @@ These were judged false positives for this environment and are not tracked:
 - `api` uses `envFrom: secretRef`, which injects every key in the Secret and
   fails silently when one is missing. `secretKeyRef` per key fails loudly and
   is preferred.
-- No PodDisruptionBudgets and no topologySpreadConstraints anywhere.
-- No NetworkPolicies on the harbourline namespace.
+- The policy set is not yet under Argo CD - it is applied by hand, which is the
+  same gap it was written to close.

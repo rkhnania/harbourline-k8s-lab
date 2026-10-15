@@ -1,0 +1,114 @@
+# Encodes the hardening decisions recorded in docs/security-decisions.md as an
+# admission control, so they survive the next person who writes a Deployment.
+#
+# Rules were installed in Audit first, the PolicyReport read, THEN switched to
+# Enforce. Never install a policy set straight into Enforce on a running cluster.
+#
+# Kyverno v1.19: failureAction is PER RULE, under validate. The old
+# spec.validationFailureAction was removed after v1.12.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: harbourline-baseline
+  annotations:
+    policies.kyverno.io/title: Harbourline workload baseline
+    policies.kyverno.io/category: Pod Security
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Requires the pod security settings that docs/security-decisions.md records
+      as Fixed, and carries the one documented exception for PostgreSQL.
+spec:
+  # background: true also evaluates pods that already exist, not just new
+  # admissions. That is what populates the PolicyReport for the running cluster.
+  background: true
+
+  rules:
+    # KSV-0012
+    - name: require-run-as-non-root
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [harbourline]
+      validate:
+        failureAction: Enforce
+        message: >-
+          spec.securityContext.runAsNonRoot must be true.
+          See docs/security-decisions.md (KSV-0012).
+        pattern:
+          spec:
+            securityContext:
+              runAsNonRoot: true
+
+    # KSV-0001
+    - name: disallow-privilege-escalation
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [harbourline]
+      validate:
+        failureAction: Enforce
+        message: >-
+          allowPrivilegeEscalation must be false on every container.
+          See docs/security-decisions.md (KSV-0001).
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  allowPrivilegeEscalation: false
+            =(initContainers):
+              - securityContext:
+                  allowPrivilegeEscalation: false
+
+    # KSV-0104
+    - name: require-seccomp-runtime-default
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [harbourline]
+      validate:
+        failureAction: Enforce
+        message: >-
+          seccompProfile.type must be RuntimeDefault.
+          See docs/security-decisions.md (KSV-0104).
+        pattern:
+          spec:
+            securityContext:
+              seccompProfile:
+                type: RuntimeDefault
+
+    # KSV-0014, with the documented exception.
+    #
+    # docs/security-decisions.md ACCEPTS readOnlyRootFilesystem on PostgreSQL:
+    # it writes a unix socket to /var/run/postgresql and scratch to /tmp, and
+    # its data volume must be writable regardless, so an immutable root removes
+    # little attacker capability. Review date 2027-01-07.
+    #
+    # The exception lives here rather than only in prose, so it is a named
+    # object someone can find, audit and remove.
+    - name: require-read-only-root-filesystem
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: [harbourline]
+      exclude:
+        any:
+          - resources:
+              selector:
+                matchLabels:
+                  app: harbourline-db
+      validate:
+        failureAction: Enforce
+        message: >-
+          readOnlyRootFilesystem must be true on every container.
+          The database is excluded by a documented, dated exception -
+          see docs/security-decisions.md (KSV-0014, review 2027-01-07).
+        pattern:
+          spec:
+            containers:
+              - securityContext:
+                  readOnlyRootFilesystem: true
