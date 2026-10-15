@@ -4,6 +4,15 @@ Three-node kubeadm cluster `harbourline-vm` on Hyper-V. All browser endpoints ar
 served by MetalLB in L2 mode from the pool `192.168.0.240-.250`
 ([`k8s/vm-cluster/metallb.yaml`](../k8s/vm-cluster/metallb.yaml)).
 
+> **Every command on this page carries `--context harbourline-vm`.**
+> There are two clusters in this kubeconfig and both have an `argocd` and a
+> `monitoring` namespace. A command without the context flag reads from whichever
+> cluster happens to be current, so it returns a confusing `NotFound` against the
+> wrong cluster instead of an obvious failure.
+>
+> Run git commands from `~/harbourline`, not the Windows clone at
+> `/mnt/c/Users/Ramsin/Claude/harbourline-k8s-lab`.
+
 ## Nodes
 
 | Node | Address | Role |
@@ -24,18 +33,57 @@ SSH: `ssh ramsin@192.168.0.201` (and .202, .203).
 
 **No credentials are stored in this repository.**
 
-Argo CD's bootstrap password:
+MetalLB assigns addresses in the order Services are created, so they move if the
+stack is reinstalled. Confirm them at any time:
 
 ```
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
+kubectl --context harbourline-vm get svc -A \
+  -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,TYPE:.spec.type,EXTERNAL-IP:.status.loadBalancer.ingress[0].ip' \
+  | grep -E '^NS|LoadBalancer'
 ```
 
-That Secret is a one-time bootstrap credential and sits in etcd in plaintext.
+## Argo CD password
+
+Bootstrap password, while the Secret still exists:
+
+```
+kubectl --context harbourline-vm -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo
+```
+
+The trailing `; echo` matters - the Secret holds no newline, so without it the
+password runs straight into the shell prompt and you cannot see where it ends.
+
+That Secret is a **one-time bootstrap credential** and sits in etcd in plaintext.
 Change the password in the UI (User Info -> Update Password), then delete it:
 
 ```
-kubectl -n argocd delete secret argocd-initial-admin-secret
+kubectl --context harbourline-vm -n argocd delete secret argocd-initial-admin-secret
 ```
+
+### Resetting a lost admin password
+
+`Error from server (NotFound)` means the bootstrap Secret is gone - either
+deleted deliberately, or you are querying the wrong cluster. Check which:
+
+```
+kubectl config current-context
+```
+
+If it really is gone, clear the stored password fields and restart the server.
+Argo CD then behaves as if freshly installed: it generates a new random password
+and recreates `argocd-initial-admin-secret`. No bcrypt tooling needed.
+
+```
+kubectl --context harbourline-vm -n argocd patch secret argocd-secret \
+  -p '{"data":{"admin.password":null,"admin.passwordMtime":null}}'
+```
+
+```
+kubectl --context harbourline-vm -n argocd rollout restart deploy/argocd-server
+```
+
+Wait about 45 seconds, then read the new password with the command above.
 
 ## Gotchas
 
@@ -44,14 +92,11 @@ kubectl -n argocd delete secret argocd-initial-admin-secret
   `ERR_TOO_MANY_REDIRECTS`. The certificate is self-signed, so the browser
   warning is expected.
 - **The Longhorn UI has no authentication.** It is reachable by anything on the
-  LAN and can delete volumes. Fine for a lab; in production it goes behind an
-  Ingress with auth, or stays on a ClusterIP reached by port-forward.
-- Addresses are assigned by MetalLB in the order Services are created, so they
-  can change if the stack is reinstalled. Confirm with:
-
-```
-kubectl get svc -A -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,TYPE:.spec.type,EXTERNAL-IP:.status.loadBalancer.ingress[0].ip' | grep -E '^NS|LoadBalancer'
-```
+  LAN and can delete volumes. Acceptable in a lab; in production it goes behind
+  an Ingress with auth, or stays on a ClusterIP reached by port-forward.
+- `argocd-application-controller` is a **StatefulSet**, not a Deployment - a
+  deliberate singleton so two controllers never fight over the same Application.
+  `kubectl rollout restart deploy/...` will not match it.
 
 ## GitOps
 
