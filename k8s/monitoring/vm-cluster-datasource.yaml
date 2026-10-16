@@ -1,29 +1,39 @@
 # Adds the VM cluster's Prometheus to the KIND cluster's Grafana, so one Grafana
-# shows both clusters.
+# shows both clusters. There is exactly ONE Grafana in this project; the VM
+# cluster's duplicate was retired 2026-10-16 (see k8s/vm-cluster/kps-values.yaml).
 #
 #   kubectl --context kind-harbourline apply -f k8s/monitoring/vm-cluster-datasource.yaml
+#   kubectl --context kind-harbourline -n monitoring rollout restart deploy/kps-grafana
 #
-# Prerequisite on the VM cluster - Prometheus must be reachable off-cluster:
-#   kubectl --context harbourline-vm -n monitoring patch svc \
-#     kps-kube-prometheus-stack-prometheus -p '{"spec":{"type":"LoadBalancer"}}'
+# The grafana_datasource label is what matters: the kube-prometheus-stack Grafana
+# runs a sidecar that watches for ConfigMaps carrying it and loads them without
+# editing Grafana config.
 #
-# The grafana_datasource label is what matters: the kube-prometheus-stack
-# Grafana runs a sidecar that watches for ConfigMaps carrying it and loads them
-# without editing Grafana config or restarting the pod.
+# NAME, NOT ADDRESS - AND WHY THAT TOOK WORK.
+# This used to point at http://192.168.0.243:9090, a MetalLB address created by
+# an imperative `kubectl patch svc ... type=LoadBalancer`. That patch was never
+# in Git, so the next `helm upgrade` of the kps release reverted the Service to
+# ClusterIP and this datasource broke with "i/o timeout" - the address went dark
+# with no warning and nothing to explain it. That happened on 2026-10-16.
+#
+# It now goes through Traefik on the VM cluster, by name. Which required
+# teaching the name to TWO resolvers, because there are two kinds of client:
+#   - browsers -> the Windows hosts file
+#   - pods     -> the kind cluster's CoreDNS (k8s/kind/coredns.yaml)
+# Grafana is a pod. It does not read your hosts file. A hostname is only
+# canonical if the CLIENT can resolve it.
 #
 # DIRECTION IS NOT A PREFERENCE. WSL2 is NAT'd: the kind cluster can reach
 # 192.168.0.x, but nothing on the LAN can reach into WSL. So the hub must be the
-# kind cluster. Verified before building on it, from inside a pod rather than
-# from WSL - different network path, different answer:
-#   kubectl --context kind-harbourline -n monitoring run netcheck --restart=Never \
-#     --image=curlimages/curl:8.11.1 --command -- sh -c \
-#     'curl -s -o /dev/null -w "%{http_code}\n" http://192.168.0.243:9090/-/healthy; sleep 2'
+# kind cluster.
+#
+# tlsSkipVerify: the certificate is self-signed (one wildcard cert for
+# *.hl.internal, held by Traefik's TLSStore). DEBT: replace with cert-manager
+# and a local CA issuer, then drop this line.
 #
 # LIMIT: this is two datasources, not federation. You pick a cluster per
-# dashboard; no single query spans both, so "CPU across the whole estate" is not
-# possible this way. That needs Thanos or Grafana Mimir - a layer above several
-# Prometheus servers presenting one queryable endpoint. Two datasources is right
-# at two clusters; Thanos is right at twenty.
+# dashboard; no single query spans both. That needs Thanos or Grafana Mimir.
+# Two datasources is right at two clusters; Thanos is right at twenty.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -36,12 +46,13 @@ data:
     apiVersion: 1
     datasources:
       - name: Prometheus-VM
+        # UID is unchanged on purpose - dashboards reference it, and changing it
+        # would silently orphan every panel pinned to this datasource.
         uid: prometheus-vm
         type: prometheus
         access: proxy
-        # MetalLB assigns in creation order: .240 Longhorn, .241 Grafana,
-        # .242 Argo CD, .243 Prometheus. Re-check after any reinstall.
-        url: http://192.168.0.243:9090
+        url: https://prometheus.hl.internal
         isDefault: false
         jsonData:
           timeInterval: 30s
+          tlsSkipVerify: true

@@ -1,6 +1,7 @@
 # VM cluster - access
 
-Three-node kubeadm cluster `harbourline-vm` on Hyper-V. All browser endpoints are
+Three-node kubeadm cluster `harbourline-vm` on Hyper-V. Every browser endpoint is
+reached by **hostname**, through a single Traefik front door on `192.168.0.241`
 served by MetalLB in L2 mode from the pool `192.168.0.240-.250`
 ([`k8s/vm-cluster/metallb.yaml`](../k8s/vm-cluster/metallb.yaml)).
 
@@ -25,22 +26,84 @@ SSH: `ssh ramsin@192.168.0.201` (and .202, .203).
 
 ## Web endpoints
 
+**One address, three names.** Traefik ([`k8s/vm-cluster/traefik-values.yaml`](../k8s/vm-cluster/traefik-values.yaml))
+holds `192.168.0.241` and routes by `Host` header. Routing is declared in
+[`k8s/vm-cluster/platform-ingress.yaml`](../k8s/vm-cluster/platform-ingress.yaml).
+
 | Service | URL | User | Password |
 |---|---|---|---|
-| Longhorn UI | http://192.168.0.240 | - | none (no auth by default) |
-| Grafana | http://192.168.0.241 | `admin` | set at install with `--set grafana.adminPassword` |
-| Argo CD | **https**://192.168.0.242 | `admin` | see below |
+| Argo CD | https://argocd.hl.internal | `admin` | see below |
+| Longhorn UI | https://longhorn.hl.internal | `admin` | BasicAuth, set at secret creation |
+| Prometheus | https://prometheus.hl.internal | - | **none - known gap, see Security** |
 
 **No credentials are stored in this repository.**
 
-MetalLB assigns addresses in the order Services are created, so they move if the
-stack is reinstalled. Confirm them at any time:
+> **Grafana is not on this cluster.** There is exactly ONE Grafana for the whole
+> project, on the kind cluster at http://grafana.localtest.me, with this
+> cluster's Prometheus as a second datasource. The VM cluster ran a second,
+> redundant Grafana until 2026-10-16; it showed the same data to the same person
+> and cost 10Gi of the Longhorn pool.
+
+TLS is one self-signed wildcard certificate for `*.hl.internal`, held by Traefik's
+`TLSStore` in the `traefik` namespace. Browsers warn; that is expected.
+**Debt:** replace with cert-manager and a local CA issuer.
+
+### Why `.internal`
+
+ICANN reserved `.internal` for private use. **Not `.local`** - that is
+mDNS/Bonjour, and using it for unicast DNS causes intermittent resolution
+failures that are miserable to debug. **Not `.lan`** - unreserved, and could be
+delegated as a real gTLD.
+
+### Name resolution: two clients, two mechanisms
+
+A hostname is only canonical if the **client** can resolve it, and there are two
+kinds of client:
+
+| Client | Resolves via | Configured in |
+|---|---|---|
+| Your browser | Windows hosts file | `C:\Windows\System32\drivers\etc\hosts` |
+| A pod (e.g. Grafana) | the **kind** cluster's CoreDNS | [`k8s/kind/coredns.yaml`](../k8s/kind/coredns.yaml) |
+
+Both point `argocd`/`longhorn`/`prometheus`.`hl.internal` at `192.168.0.241`.
+
+Hosts file entries must sit **below** Docker Desktop's `# End of section`
+marker - Docker rewrites everything inside that block, and your entries vanish
+on its next restart with no warning.
+
+Add them from an **administrator** PowerShell:
 
 ```
-kubectl --context harbourline-vm get svc -A \
-  -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,TYPE:.spec.type,EXTERNAL-IP:.status.loadBalancer.ingress[0].ip' \
-  | grep -E '^NS|LoadBalancer'
+$h="$env:WINDIR\System32\drivers\etc\hosts"; $c=@((Get-Content $h) -notmatch 'hl\.internal'); $c+="192.168.0.241 argocd.hl.internal","192.168.0.241 longhorn.hl.internal","192.168.0.241 prometheus.hl.internal"; Set-Content -Encoding ASCII $h $c
 ```
+
+If a name fails to resolve in Chrome but `ping` resolves it, the cause is
+Chrome's own DNS cache or its **Secure DNS** setting, which bypasses the hosts
+file. Clear `chrome://net-internals/#dns` and turn off Secure DNS in
+`chrome://settings/security`.
+
+### Testing routing without DNS
+
+```
+curl -sSk -o /dev/null -w '%{http_code}\n' --resolve argocd.hl.internal:443:192.168.0.241 https://argocd.hl.internal/
+```
+
+`--resolve` sends the real `Host` header and TLS SNI while skipping DNS, which
+**separates "routing is broken" from "the name does not resolve"**. Prove the
+proxy first, add DNS second.
+
+Expected: Argo CD `200`, Longhorn `401` (BasicAuth), Prometheus `302`.
+A `404` means Traefik has no router for that Host; a `503` means the router
+exists but the backing Service has no endpoints.
+
+### Confirming which addresses are in use
+
+```
+kubectl --context harbourline-vm get svc -A --field-selector spec.type=LoadBalancer \
+  -o custom-columns='NS:.metadata.namespace,NAME:.metadata.name,IP:.status.loadBalancer.ingress[0].ip'
+```
+
+Should return exactly one row: `traefik` on `192.168.0.241`.
 
 ## Argo CD password
 
@@ -87,13 +150,18 @@ Wait about 45 seconds, then read the new password with the command above.
 
 ## Gotchas
 
-- **Argo CD is `https`, not `http`.** `argocd-server` redirects HTTP to HTTPS
-  itself; behind a LoadBalancer that terminates nothing, hitting port 80 gives
-  `ERR_TOO_MANY_REDIRECTS`. The certificate is self-signed, so the browser
-  warning is expected.
-- **The Longhorn UI has no authentication.** It is reachable by anything on the
-  LAN and can delete volumes. Acceptable in a lab; in production it goes behind
-  an Ingress with auth, or stays on a ClusterIP reached by port-forward.
+- **`argocd-server` runs with `--insecure`.** It speaks plain HTTP inside the
+  cluster and Traefik terminates TLS at the edge. Without this it issues its own
+  HTTP->HTTPS redirect, which fights the proxy's and produces
+  `ERR_TOO_MANY_REDIRECTS` - the most-reported Argo CD issue. Set in the
+  `argocd-cmd-params-cm` ConfigMap; externally you still get HTTPS.
+- **The old addresses are gone on purpose.** `https://192.168.0.242` now gives
+  `ERR_CONNECTION_RESET`, because something *is* listening and it rejected a TLS
+  handshake it no longer speaks. Refused = nothing on that port; timeout =
+  nothing at that address; **reset = listening, but rejected what you sent**.
+- **The Longhorn UI is behind BasicAuth** (Traefik `Middleware`, credentials in
+  the `longhorn-basic-auth` Secret, never in Git). It previously had no
+  authentication at all while reachable by anything on the LAN.
 - `argocd-application-controller` is a **StatefulSet**, not a Deployment - a
   deliberate singleton so two controllers never fight over the same Application.
   `kubectl rollout restart deploy/...` will not match it.

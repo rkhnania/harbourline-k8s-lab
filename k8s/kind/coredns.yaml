@@ -1,0 +1,63 @@
+# CoreDNS for the KIND cluster, with one addition: the hl.internal names that
+# live on the VM cluster.
+#
+# WHY: Grafana runs here and queries Prometheus on the VM cluster. A pod does
+# NOT read the Windows hosts file - it resolves through CoreDNS. So the name
+# prometheus.hl.internal has to be taught twice, once per kind of client:
+#   - browsers -> Windows hosts file
+#   - pods     -> this file
+# That is the whole reason "use a hostname everywhere" needs work rather than a
+# search-and-replace: a hostname is only canonical if the CLIENT can resolve it.
+#
+# NOT managed by Argo CD on purpose. No Application points at k8s/kind/. A
+# pruned or malformed coredns ConfigMap takes DNS away from every pod in the
+# cluster at once, and the symptom is apps failing to reach the database - it
+# does not look like DNS. This stays a deliberate, manual change.
+#
+# Apply:
+#   kubectl --context kind-harbourline apply -f k8s/kind/coredns.yaml
+#
+# CoreDNS has the `reload` plugin enabled, so it picks the change up within
+# about 30 seconds on its own. No restart is required.
+#
+# Recreating the kind cluster from k8s/kind-cluster.yaml resets this file to
+# the default - reapply it afterwards.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+        hosts {
+           192.168.0.241 argocd.hl.internal longhorn.hl.internal prometheus.hl.internal
+           # FALLTHROUGH IS NOT OPTIONAL. The hosts plugin answers authoritatively
+           # for the zone it is given; without fallthrough it returns NXDOMAIN for
+           # every name NOT in the list above - which is every name in the
+           # cluster. Omitting this one word breaks DNS for the whole cluster
+           # while looking like a harmless three-line addition.
+           fallthrough
+        }
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        forward . /etc/resolv.conf {
+           max_concurrent 1000
+        }
+        cache 30 {
+           disable success cluster.local
+           disable denial cluster.local
+        }
+        loop
+        reload
+        loadbalance
+    }

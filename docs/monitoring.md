@@ -1,14 +1,34 @@
 # Monitoring the VM cluster
 
-Self-contained on the kubeadm VM cluster rather than federated into the kind
-cluster's Grafana, so the VM cluster stands alone as a complete environment.
+Prometheus, Alertmanager and the exporters run on the VM cluster. **Grafana does
+not.** There is exactly ONE Grafana in this project, on the kind cluster, with
+this cluster's Prometheus as a second datasource.
 
 | Component | Namespace | Address |
 |---|---|---|
 | metrics-server | `kube-system` | - |
 | kube-prometheus-stack (`kps`) | `monitoring` | - |
-| Grafana | `monitoring` | http://192.168.0.241 (MetalLB) |
-| Longhorn UI | `longhorn-system` | http://192.168.0.240 (MetalLB) |
+| Prometheus | `monitoring` | https://prometheus.hl.internal |
+| Grafana | *kind cluster* | http://grafana.localtest.me |
+| Longhorn UI | `longhorn-system` | https://longhorn.hl.internal |
+
+### A decision that was reversed, and the half that got left behind
+
+On 14 Oct this stack was built self-contained, with its own Grafana on
+`192.168.0.241`, on the reasoning that the VM cluster should stand alone.
+On 15 Oct that was reversed - one Grafana, both clusters - and the kind
+Grafana gained a `Prometheus-VM` datasource. **The VM cluster's Grafana was
+never removed**, so for a day the project had two Grafanas showing the same
+data to the same person, one of them costing 10Gi of the 78Gi Longhorn pool
+(5Gi PVC x 2 replicas) plus a MetalLB address.
+
+Retired 2026-10-16. The trade-off, accepted knowingly: with the kind cluster
+stopped there is no dashboard UI for this cluster. Prometheus here keeps
+scraping and retaining regardless, so nothing is lost but the view.
+
+> Reversing a decision is cheap. **Finishing the reversal** is the part that
+> gets skipped, and what is left behind does not announce itself - it just sits
+> there consuming storage and looking like it is meant to be there.
 
 Values: [`k8s/vm-cluster/kps-values.yaml`](../k8s/vm-cluster/kps-values.yaml)
 

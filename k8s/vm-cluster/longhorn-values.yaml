@@ -1,0 +1,18 @@
+# Longhorn values for the Harbourline VM cluster.
+#
+# The ONLY user-supplied value this release ever had was service.ui.type:
+# LoadBalancer, which took MetalLB .240. The UI is now reached through Traefik
+# at https://longhorn.hl.internal, with BasicAuth in front of it, so the
+# dedicated address is no longer needed and .240 returns to the pool.
+#
+# Captured in a file because the original value existed only in shell history -
+# `helm get values` was the only record that it had ever been set.
+#
+# Upgrade:
+#   helm --kube-context harbourline-vm upgrade longhorn longhorn/longhorn \
+#     -n longhorn-system --version 1.13.0 \
+#     -f k8s/vm-cluster/longhorn-values.yaml
+
+service:
+  ui:
+    type: ClusterIP

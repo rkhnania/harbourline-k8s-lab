@@ -140,3 +140,43 @@ what the ecosystem overwhelmingly runs today.
   is preferred.
 - The policy set is not yet under Argo CD - it is applied by hand, which is the
   same gap it was written to close.
+
+## VM cluster exposure (2026-10-16)
+
+Every service on the VM cluster used to sit on its own MetalLB address with no
+name, no TLS and, in one case, no authentication. All of it now goes through a
+single Traefik front door on `192.168.0.241` - see
+[vm-cluster-access.md](vm-cluster-access.md).
+
+**Closed:** the Longhorn UI had **no authentication at all** while reachable by
+anything on the LAN, and it can delete volumes. It is now behind a Traefik
+`basicAuth` Middleware (`longhorn-basic-auth` Secret, hash only, not in Git).
+Verified by response code, not by eyeballing the page:
+
+    curl -sSk -o /dev/null -w '%{http_code}\n' \
+      --resolve longhorn.hl.internal:443:192.168.0.241 https://longhorn.hl.internal/
+    401
+
+A `200` there would mean the Middleware silently failed to attach - the
+annotation format is `<namespace>-<name>@kubernetescrd` and a typo in it does
+not error, it just does nothing.
+
+**Still open:** `prometheus.hl.internal` has **no authentication**, same as the
+address it replaced. Read-only metrics rather than a delete button, so it was
+left out of this change to keep it reviewable - but metrics leak topology,
+hostnames and workload names. Fix is the same Middleware plus `basicAuth` in the
+kind cluster's Grafana datasource config.
+
+**Still open:** TLS is a self-signed wildcard for `*.hl.internal`, so every
+browser warns and `tlsSkipVerify: true` is set on the Grafana datasource. A
+warning users are trained to click through is worth little. Fix is cert-manager
+with a local CA issuer, already on the backlog.
+
+**ingress-nginx was rejected for this.** Kubernetes SIG Network retired it -
+best-effort maintenance ended March 2026, with no further releases, bugfixes or
+security patches, and the charts and images still download without warning. An
+unpatchable edge proxy is not a reasonable thing to make the single entry point
+to a cluster. Traefik is maintained and also speaks Gateway API, which is the
+longer-term destination. The **kind cluster still runs ingress-nginx** and is a
+known debt to migrate.
+https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/

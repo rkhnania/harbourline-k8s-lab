@@ -12,13 +12,19 @@
 # or move it to a Secret once External Secrets Operator is in place.
 
 grafana:
-  # Exposed by MetalLB from the 192.168.0.240-.250 pool.
-  service:
-    type: LoadBalancer
-  persistence:
-    enabled: true
-    storageClassName: longhorn-2
-    size: 5Gi
+  # DISABLED 2026-10-16. There is ONE Grafana for this project and it runs on the
+  # kind cluster at http://grafana.localtest.me, reading THIS cluster's Prometheus
+  # as a second datasource (k8s/monitoring/vm-cluster-datasource.yaml).
+  #
+  # A second Grafana here showed the same data to the same person and cost a 5Gi
+  # PVC - 10Gi of the 78Gi Longhorn pool, because longhorn-2 keeps 2 replicas -
+  # plus one of the eleven MetalLB addresses.
+  #
+  # Trade-off, accepted knowingly: with the kind cluster stopped there is no
+  # dashboard UI for this cluster. Prometheus here keeps scraping and retaining
+  # regardless, so no data is lost - only the view. `kubectl top` and
+  # http://prometheus.hl.internal still answer.
+  enabled: false
 
 prometheus:
   prometheusSpec:

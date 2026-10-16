@@ -1,0 +1,105 @@
+# Traefik - the single front door for the Harbourline VM cluster.
+# Chart pinned to 41.7.1 (Traefik v3.7.14).
+#
+# WHY TRAEFIK AND NOT INGRESS-NGINX
+# ingress-nginx was retired by Kubernetes SIG Network: best-effort maintenance
+# ended March 2026, and there are no further releases, bugfixes or security
+# patches. Its charts and images stay downloadable, so nothing warns you - the
+# install simply succeeds and is unpatchable from then on.
+#   https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/
+# The kind cluster still runs ingress-nginx and is a known debt to migrate.
+#
+# WHY THIS EXISTS AT ALL
+# Every service here used to have its own MetalLB address and no name:
+# Longhorn .240, Grafana .241, Argo CD .242, Prometheus .243. Four addresses,
+# no DNS, no TLS, and no authentication in front of Longhorn.
+#
+# Install:
+#   helm repo add traefik https://traefik.github.io/charts
+#   helm --kube-context harbourline-vm install traefik traefik/traefik \
+#     -n traefik --create-namespace --version 41.7.1 \
+#     -f k8s/vm-cluster/traefik-values.yaml
+#
+# This is a values file, not a manifest. The vm-platform Argo CD Application
+# points at this directory and logs-and-skips non-Kubernetes files, so Argo
+# ignores it. The Ingress objects it serves ARE managed by Argo.
+
+deployment:
+  # One per worker; the control plane is tainted, so that is the whole set.
+  replicas: 2
+
+service:
+  type: LoadBalancer
+  annotations:
+    # PIN THE ADDRESS. MetalLB otherwise allocates the next free address in
+    # creation order, so the cluster's front door would move whenever something
+    # is reinstalled in a different order. This address is referenced by the
+    # Windows hosts file and by the kind cluster's CoreDNS, so it must be
+    # stable. .241 was freed when the duplicate Grafana was retired 2026-10-16.
+    metallb.io/loadBalancerIPs: 192.168.0.241
+
+ports:
+  web:
+    exposedPort: 80
+    http:
+      # Everything is pushed to HTTPS at the edge. Argo CD used to do this
+      # redirect itself, which is what causes the classic redirect loop when it
+      # sits behind a proxy that terminates nothing. Here it happens once, in
+      # one place, for every service on the cluster.
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    exposedPort: 443
+    # TLS is already on for this entrypoint by default, with Traefik's own
+    # self-signed certificate as the fallback. Each Ingress that names a tls
+    # secret overrides it for that hostname.
+
+providers:
+  # Standard Ingress objects - what the manifests in this repo use.
+  kubernetesIngress:
+    enabled: true
+    publishedService:
+      # Writes the load balancer address back onto Ingress .status, so
+      # `kubectl get ingress` shows the real entry point instead of blank.
+      enabled: true
+  # Traefik's own CRDs. Needed for Middleware, which is how BasicAuth gets in
+  # front of the Longhorn UI.
+  kubernetesCRD:
+    enabled: true
+  # Gateway API is the official successor to Ingress and the migration path out
+  # of this whole class of problem. Off for now: Cilium is already on this
+  # cluster and also implements Gateway API, so enabling both would mean two
+  # controllers racing for the same Gateway objects. One deliberate decision at
+  # a time.
+  kubernetesGateway:
+    enabled: false
+
+ingressClass:
+  enabled: true
+  # NOT the cluster default. Every Ingress in this repo names its class
+  # explicitly, so a manifest that forgets to should be ignored rather than
+  # silently picked up by whichever controller claims the default.
+  isDefaultClass: false
+
+log:
+  level: INFO
+
+accessLog:
+  # Off by default in this chart. On here, because the entire cluster's external
+  # traffic now passes through one proxy - that makes this the single most
+  # useful log in the cluster, and Alloy is already shipping logs to Loki.
+  enabled: true
+  # JSON so Loki can parse fields instead of regexing a text line. Remember that
+  # Loki indexes LABELS, not content - parse at query time, do not promote
+  # request paths or status codes to labels.
+  format: json
+
+metrics:
+  prometheus:
+    service:
+      enabled: true
+    serviceMonitor:
+      enabled: true

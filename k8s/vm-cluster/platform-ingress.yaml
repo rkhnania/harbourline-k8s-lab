@@ -1,0 +1,115 @@
+# Routing for the Harbourline VM cluster's platform services.
+#
+# ONE front door (Traefik on 192.168.0.241), THREE hostnames. Before this,
+# every service had its own MetalLB address and no name at all.
+#
+# DOMAIN CHOICE: .internal is reserved by ICANN for private use. NOT .local,
+# which is mDNS/Bonjour - using it for unicast DNS causes intermittent,
+# miserable-to-debug resolution failures. NOT .lan, which is unreserved and
+# could be delegated as a real gTLD.
+#
+# NAME RESOLUTION is deliberately in two places, because there are two kinds of
+# client and they resolve differently:
+#   - humans    -> the Windows hosts file (and WSL /etc/hosts), pointing at .241
+#   - pods      -> the KIND cluster's CoreDNS, so Grafana can reach
+#                  prometheus.hl.internal as a datasource
+# A hostname is only canonical if the CLIENT can resolve it. grafana.localtest.me
+# works in a browser and fails from inside a pod, for exactly this reason.
+#
+# TLS: served from a single default certificate held by the TLSStore below, so
+# no Ingress here carries its own tls block and there is one certificate to
+# replace. It is self-signed, so browsers warn - same trust level as the
+# self-signed cert Argo CD was serving before. DEBT: replace with cert-manager
+# and a local CA issuer, which is already on the backlog.
+---
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: traefik
+spec:
+  defaultCertificate:
+    # Created imperatively - a TLS private key must never be in Git.
+    #   openssl req -x509 -nodes -days 825 -newkey rsa:2048 \
+    #     -keyout tls.key -out tls.crt -subj "/CN=*.hl.internal" \
+    #     -addext "subjectAltName=DNS:*.hl.internal,DNS:hl.internal"
+    #   kubectl -n traefik create secret tls hl-internal-tls \
+    #     --cert=tls.crt --key=tls.key
+    secretName: hl-internal-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd
+  namespace: argocd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: argocd.hl.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                # Port 80. argocd-server must be running with --insecure so it
+                # speaks plain HTTP here and stops issuing its own HTTP->HTTPS
+                # redirect. Without that, the redirect it sends and the one
+                # Traefik sends chase each other: ERR_TOO_MANY_REDIRECTS.
+                # TLS is terminated once, at Traefik.
+                port:
+                  number: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: longhorn-auth
+  namespace: longhorn-system
+spec:
+  basicAuth:
+    # Created imperatively with htpasswd - credentials never in Git.
+    secret: longhorn-basic-auth
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: longhorn
+  namespace: longhorn-system
+  annotations:
+    # Closes a named security debt: the Longhorn UI had NO authentication at
+    # all and was exposed on the LAN. Anyone on the network could delete
+    # volumes. Middleware reference format is <namespace>-<name>@kubernetescrd.
+    traefik.ingress.kubernetes.io/router.middlewares: longhorn-system-longhorn-auth@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: longhorn.hl.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: longhorn-frontend
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: prometheus.hl.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kps-kube-prometheus-stack-prometheus
+                port:
+                  number: 9090
