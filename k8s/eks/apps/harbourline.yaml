@@ -1,0 +1,277 @@
+# Harbourline on EKS. Images come from ECR; the node's IAM role authorises the
+# pull, so there is NO imagePullSecret anywhere in this file.
+#
+#   kubectl apply -f k8s/eks/apps/harbourline.yaml
+#
+# The db password Secret is NOT here and never in Git. Create it first:
+#   kubectl -n harbourline create secret generic harbourline-db-secret \
+#     --from-literal=DB_PASSWORD="$(openssl rand -base64 24)"
+#
+# harbourline-web is type: LoadBalancer with no annotations, so the in-tree AWS
+# cloud controller provisions a CLASSIC load balancer. Deliberate: it needs no
+# add-on. An ALB would require the AWS Load Balancer Controller + an Ingress.
+#
+# TEARDOWN ORDER MATTERS. Delete the Kubernetes objects BEFORE the cluster:
+#   kubectl -n harbourline delete svc harbourline-web   # releases the CLB
+#   kubectl -n harbourline delete pvc --all             # releases the EBS volume
+# Kill the cluster first and the LB and volume are orphaned, still billing,
+# with nothing left to reconcile them. Then verify with k8s/eks/teardown-check.sh.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: harbourline
+---
+# The aws-ebs-csi-driver addon installs the DRIVER but creates no StorageClass.
+# Without this, every PVC sits Pending forever with no obvious error - a classic
+# EKS gotcha. gp3 is cheaper and faster than gp2 and should be the default.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+parameters:
+  type: gp3
+  encrypted: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: harbourline-config
+  namespace: harbourline
+data:
+  DB_HOST: harbourline-db
+  DB_NAME: postgres
+  DB_PORT: "5432"
+  DB_USER: postgres
+  ENVIRONMENT: eks
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbourline-db
+  namespace: harbourline
+spec:
+  clusterIP: None
+  selector:
+    app: harbourline-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: harbourline-db
+  namespace: harbourline
+spec:
+  serviceName: harbourline-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: harbourline-db
+  template:
+    metadata:
+      labels:
+        app: harbourline-db
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: harbourline-db-secret
+                  key: DB_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harbourline-api
+  namespace: harbourline
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: harbourline-api
+  template:
+    metadata:
+      labels:
+        app: harbourline-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: 633032492701.dkr.ecr.ap-southeast-2.amazonaws.com/harbourline-api:39e63f9
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: harbourline-config
+            - secretRef:
+                name: harbourline-db-secret
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            periodSeconds: 10
+          startupProbe:
+            httpGet: { path: /health, port: 8080 }
+            periodSeconds: 3
+            failureThreshold: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbourline-api
+  namespace: harbourline
+spec:
+  selector:
+    app: harbourline-api
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: harbourline-web
+  namespace: harbourline
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: harbourline-web
+  template:
+    metadata:
+      labels:
+        app: harbourline-web
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: 633032492701.dkr.ecr.ap-southeast-2.amazonaws.com/harbourline-web:39e63f9
+          ports:
+            - containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /var/cache/nginx
+          readinessProbe:
+            httpGet: { path: /, port: 8080 }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: 8080 }
+            periodSeconds: 10
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+---
+# type: LoadBalancer on EKS makes the AWS cloud controller provision a real load
+# balancer with a public DNS name - no Ingress controller required.
+#
+# Compare with MetalLB on the VM cluster: there, a speaker pod answers ARP for
+# an address on your LAN. Here, AWS creates managed infrastructure outside the
+# cluster entirely and hands back a hostname.
+#
+# THIS LOAD BALANCER IS CREATED BY KUBERNETES, NOT BY eksctl. It is in no
+# CloudFormation stack and SURVIVES `eksctl delete cluster`. Delete this Service
+# before deleting the cluster, or it bills on forever.
+apiVersion: v1
+kind: Service
+metadata:
+  name: harbourline-web
+  namespace: harbourline
+  # NO aws-load-balancer-type annotation on purpose.
+  #
+  # Setting it to "external" hands the Service to the AWS Load Balancer
+  # Controller - which is a separate install we have NOT done. The Service would
+  # then sit at <pending> forever with nothing logging a reason: an unfulfilled
+  # request, not a failed one. Same shape as MetalLB <pending> on the VM cluster
+  # before the IPAddressPool existed.
+  #
+  # Without it, the in-tree AWS cloud controller provisions a Classic Load
+  # Balancer itself. Older technology, but it works with zero extra components.
+spec:
+  type: LoadBalancer
+  selector:
+    app: harbourline-web
+  ports:
+    - port: 80
+      targetPort: 8080
