@@ -15,7 +15,7 @@ each of those breaks.
 
 | | **kind** `harbourline` | **VM cluster** `harbourline-vm` | **AWS** |
 |---|---|---|---|
-| Built with | `kind` (Docker, WSL2) | **`kubeadm` v1.34, from scratch** | `eksctl` |
+| Built with | `kind` (Docker, WSL2) | **`kubeadm` v1.37, from scratch** | `eksctl` |
 | Nodes | 1 control plane + 2 workers | 3 Hyper-V VMs (Ubuntu 24.04) | managed control plane + 2 × t3.medium |
 | CNI | kindnet | **Cilium** | VPC CNI |
 | Storage | local-path | **Longhorn** (iSCSI, 2 replicas) | EBS CSI (gp3) |
