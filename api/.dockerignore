@@ -5,3 +5,11 @@ __pycache__
 venv
 db.env
 db.env
+
+# Test-only files. The Dockerfiles COPY named files rather than the whole
+# directory, so these could never reach the image anyway - excluded to keep the
+# build context small and the intent explicit.
+tests/
+requirements-dev.txt
+pytest.ini
+.pytest_cache

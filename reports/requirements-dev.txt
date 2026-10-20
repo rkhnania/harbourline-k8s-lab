@@ -1,0 +1,4 @@
+# Test-only dependencies. NOT installed into the runtime image - api/Dockerfile
+# copies requirements.txt only, so pytest never ships to production.
+pytest==8.3.4
+pytest-cov==6.0.0
