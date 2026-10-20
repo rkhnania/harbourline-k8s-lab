@@ -1,2 +1,11 @@
 flask==3.0.3
 psycopg[binary]==3.2.3
+
+# DELIBERATELY VULNERABLE - this branch exists to prove the gate blocks.
+# requests 2.19.1 carries CVE-2018-18074 (HIGH): it sends the Authorization
+# header on a cross-origin redirect, leaking credentials to a third party.
+# Fixed in 2.20.0 - so --ignore-unfixed does NOT filter it, which is the
+# point: Trivy only reports what you could actually act on.
+# NOT imported by the application. DO NOT MERGE THIS BRANCH.
+requests==2.19.1
+
