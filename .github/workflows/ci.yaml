@@ -8,15 +8,29 @@ on:
       - 'web/**'
       - 'reports/**'
       - '.github/workflows/ci.yaml'
+  # Run everything BEFORE merge, not after. Without this, a broken change is
+  # only caught once it is already on main - which is also the branch Argo CD
+  # deploys from.
+  pull_request:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'web/**'
+      - 'reports/**'
+      - '.github/workflows/ci.yaml'
   workflow_dispatch:
 
-permissions:
-  contents: write
-  packages: write
+# No workflow-wide permissions. Each job declares the minimum it needs, and
+# anything not listed is denied. This matters because third-party actions run
+# inside these jobs with whatever token the job holds: a scanner that only
+# reads source code has no business holding write access to the repository.
+permissions: {}
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -83,7 +97,10 @@ jobs:
     # now stops an image from ever being produced, rather than being noticed
     # after it is deployed.
     needs: [test]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -99,6 +116,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -113,7 +131,7 @@ jobs:
           tags: ${{ env.IMAGE }}:${{ env.TAG }}
 
       - name: Scan ${{ matrix.component }} with Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE }}:${{ env.TAG }}
           format: table
@@ -122,15 +140,20 @@ jobs:
           exit-code: '0'
 
       - name: Push ${{ matrix.component }}
+        # PRs build and scan the image but never publish it. An image from an
+        # unmerged branch in the registry is a tag nobody can account for.
+        if: github.event_name == 'push'
         run: docker push "${IMAGE}:${TAG}"
 
   scan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
       - name: Trivy filesystem scan (dependencies and secrets)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -141,7 +164,7 @@ jobs:
           exit-code: '0'
 
       - name: Trivy config scan (Dockerfiles and Kubernetes manifests)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: .
@@ -151,7 +174,12 @@ jobs:
 
   deploy:
     needs: [build, scan]
-    runs-on: ubuntu-latest
+    # A pull request must never bump an image tag or push to main. Build and
+    # scan still run on PRs; only this job is push-only.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
