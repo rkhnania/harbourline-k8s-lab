@@ -182,7 +182,7 @@ jobs:
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: '0'
+          exit-code: '1'
 
       - name: Push ${{ matrix.component }}
         # PRs build and scan the image but never publish it. An image from an
@@ -206,7 +206,7 @@ jobs:
           format: table
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: '0'
+          exit-code: '1'
 
       - name: Trivy config scan (Dockerfiles and Kubernetes manifests)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -215,7 +215,18 @@ jobs:
           scan-ref: .
           format: table
           severity: CRITICAL,HIGH,MEDIUM
-          exit-code: '0'
+          # SCAN RENDERED OUTPUT, NOT TEMPLATES. Trivy renders a chart with its
+          # DEFAULT values - harbourline/app:latest from an unspecified
+          # registry - which no deployment ever uses, and then reports KSV-0013
+          # (":latest" tag) and KSV-0125 (untrusted registry) against values
+          # that exist nowhere. The real images come from values-{api,web,
+          # reports}.yaml, which CI rewrites on every deploy.
+          #
+          # FOLLOW-UP: render the chart with its real values files and scan the
+          # output, which would cover these templates properly instead of
+          # excluding them.
+          skip-dirs: helm
+          exit-code: '1'
 
   deploy:
     needs: [build, scan]

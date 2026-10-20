@@ -8,9 +8,23 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      # postgres:16-alpine runs psql as uid 70 (the postgres user in that image).
+      # Added 2026-10-20 after Trivy KSV-0118/0012/0104: these two workloads
+      # predate the hardening applied to the Deployments and were never
+      # revisited, so they were running with the default security context.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: migrate
           image: postgres:16-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: PGPASSWORD
               valueFrom:

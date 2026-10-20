@@ -6,3 +6,18 @@
 # volume. Achievable with additional emptyDir mounts but low value on a
 # single-tenant stateful workload whose data volume is writable regardless.
 KSV-0014
+
+# KSV-01010 "ConfigMap stores sensitive contents in key(s) or value(s)".
+# Added 2026-10-20, review 2027-04-20.
+#
+# Fires on harbourline-config for the key DB_PORT, whose value is 5432. The
+# rule matches on KEY NAMES against a heuristic list; a port number is not a
+# secret and there is nothing to fix.
+#
+# KNOWN COST OF THIS EXCEPTION: it is repository-wide, so a real credential
+# placed in a ConfigMap would also go unflagged by this rule. That risk is
+# carried by three other controls - Trivy's secret scanner matches on value
+# PATTERNS rather than key names, Kyverno blocks on admission, and secrets
+# are created imperatively and never committed (docs/cluster-state-not-in-git.md).
+KSV-01010
+
