@@ -4,7 +4,7 @@ replicaCount: 2
 
 image:
   repository: ghcr.io/rkhnania/harbourline-reports
-  tag: "1a47620"
+  tag: "7d66df1"
 
 strategy:
   type: RollingUpdate
