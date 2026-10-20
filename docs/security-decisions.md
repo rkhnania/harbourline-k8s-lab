@@ -180,3 +180,67 @@ to a cluster. Traefik is maintained and also speaks Gateway API, which is the
 longer-term destination. The **kind cluster still runs ingress-nginx** and is a
 known debt to migrate.
 https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/
+
+## SonarCloud findings: accepted exceptions (2026-10-20)
+
+First SonarCloud analysis reported **Security rating E**, 30 security issues,
+40 open issues over 2.3k lines. Triaged before any quality gate was switched
+on, because a gate tuned to an unread baseline either blocks everything or
+gets turned off within a week.
+
+Twelve issues at Blocker/High impact. Six were genuinely right and are fixed
+(SHA-pinning every GitHub Action). Two were trivial and fixed (`[[` in
+`teardown-check.sh`). **Four are accepted exceptions, recorded here.**
+
+### S8392 — "Avoid binding the application to all network interfaces" (BLOCKER x2)
+
+`api/app.py:46`, `reports/app.py:49` — `app.run(host="0.0.0.0", ...)`
+
+**Accepted.** A containerised application MUST bind `0.0.0.0`. Each container
+has its own network namespace; binding `127.0.0.1` means the listener is
+reachable only from inside that namespace, so kube-proxy, the Service, the
+kubelet's probes and every other pod get connection refused. The pod would
+pass its own health check and serve nobody.
+
+The rule is written for processes on a shared host, where binding all
+interfaces exposes a service beyond its intended network. In Kubernetes that
+boundary is enforced by the network namespace, the Service, and the
+NetworkPolicies in `k8s/base/networkpolicies.yaml` - not by the bind address.
+
+**Both of the project's Blockers are this rule.** The E rating is driven
+almost entirely by a finding that is wrong for this deployment model.
+
+**Review: 2027-04-20**, or sooner if these services are ever run outside a
+container.
+
+### S4502 — "Make sure disabling CSRF protection is safe here" (HIGH x2)
+
+`api/app.py:4`, `reports/app.py:4` — `app = Flask(__name__)`
+
+**Accepted.** The rule flags any Flask app without Flask-WTF CSRF protection.
+CSRF requires three things to be exploitable: a state-changing request, a
+browser that attaches credentials automatically (a cookie or HTTP auth), and
+a victim session. These services have none of them:
+
+  - every route is **GET** and read-only - `/health`, `/config`, `/dbcheck`,
+    `/shipments`, `/reports/summary`, `/reports/carriers`
+  - no cookies, no sessions, no `flask_login`, no authentication of any kind
+  - responses are JSON, consumed by nginx and by `curl`
+
+Adding Flask-WTF would add a dependency and a token flow that protects
+nothing.
+
+**This exception is void the moment a POST, PUT, PATCH or DELETE route is
+added, or any form of session cookie appears.** That is the trigger to
+revisit, not the review date.
+
+**Review: 2027-04-20.**
+
+### How these are recorded
+
+Marked in SonarCloud as **won't fix / accepted** with a comment pointing at
+this file. Both halves matter: suppressing in the tool alone hides the
+reasoning from anyone reading the repository, and documenting here alone
+leaves the quality gate failing forever on findings that were deliberately
+accepted.
+

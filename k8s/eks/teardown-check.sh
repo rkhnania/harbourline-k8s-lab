@@ -18,7 +18,7 @@ check() {
   local label="$1"; shift
   local out
   out="$("$@" 2>/dev/null)"
-  if [ -n "$out" ]; then
+  if [[ -n "$out" ]]; then
     printf '\033[31mSTILL THERE\033[0m  %s\n%s\n\n' "$label" "$out"
     FOUND=1
   else
@@ -69,7 +69,7 @@ check "EKS CloudWatch log groups" \
   --query 'logGroups[?contains(logGroupName,`eks`)].[logGroupName,storedBytes]' --output text
 
 echo
-if [ "$FOUND" -eq 0 ]; then
+if [[ "$FOUND" -eq 0 ]]; then
   printf '\033[32mAll clear - nothing in %s is billing.\033[0m\n' "$REGION"
 else
   printf '\033[31mSomething survived the teardown. Deal with it now, not tomorrow.\033[0m\n'

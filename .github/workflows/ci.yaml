@@ -57,9 +57,9 @@ jobs:
           --health-retries 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           # Matches python:3.12-slim in the Dockerfiles. Test on the runtime
           # you ship: the dependencies are pinned against 3.12, and a failure
@@ -84,7 +84,7 @@ jobs:
         # if: always() - without it this step is skipped when the tests fail,
         # which is precisely when the report is worth having.
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: test-results-${{ matrix.component }}
           path: |
@@ -92,11 +92,56 @@ jobs:
             ${{ matrix.component }}/coverage.xml
           retention-days: 30
 
-  build:
-    # Nothing is built until the tests pass. This is the gate: a failing test
-    # now stops an image from ever being produced, rather than being noticed
-    # after it is deployed.
+  sonar:
     needs: [test]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Full history, not the default shallow clone. SonarCloud uses git
+          # blame to attribute each line to a commit and date, which is how
+          # "new code" is determined. Shallow-cloned, it cannot, and either
+          # warns or treats the entire repository as new - which makes a
+          # new-code quality gate meaningless.
+          fetch-depth: 0
+
+      # Coverage comes from the test matrix rather than being regenerated here.
+      # upload-artifact strips the common prefix, so each artefact contains
+      # coverage.xml at its root and is restored into the service directory
+      # that sonar-project.properties expects.
+      - name: Download api coverage
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: test-results-api
+          path: api
+
+      - name: Download reports coverage
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: test-results-reports
+          path: reports
+
+      - name: SonarQube Cloud scan and quality gate
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        env:
+          # The only secret this job sees. Never echoed, never written to a
+          # file - the action reads it from the environment.
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          # qualitygate.wait makes the scanner submit the analysis, poll for
+          # the gate result, and FAIL THIS STEP if the gate fails. Without it
+          # the scan is advisory: SonarCloud records the problem and the
+          # pipeline carries on regardless, which is the state the Trivy scans
+          # are still in.
+          args: -Dsonar.qualitygate.wait=true
+
+  build:
+    # Nothing is built until the tests pass AND the quality gate is green.
+    # A failing test or a failed gate now stops an image from ever being
+    # produced, rather than being noticed after it is deployed.
+    needs: [test, sonar]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -106,32 +151,32 @@ jobs:
       matrix:
         component: [api, web, reports]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set tag and image name
         run: |
           echo "TAG=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
           echo "IMAGE=ghcr.io/${{ github.repository_owner }}/harbourline-${{ matrix.component }}" >> "$GITHUB_ENV"
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to GHCR
         if: github.event_name == 'push'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build ${{ matrix.component }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: ./${{ matrix.component }}
           load: true
           tags: ${{ env.IMAGE }}:${{ env.TAG }}
 
       - name: Scan ${{ matrix.component }} with Trivy
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.IMAGE }}:${{ env.TAG }}
           format: table
@@ -150,10 +195,10 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Trivy filesystem scan (dependencies and secrets)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -164,7 +209,7 @@ jobs:
           exit-code: '0'
 
       - name: Trivy config scan (Dockerfiles and Kubernetes manifests)
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: config
           scan-ref: .
@@ -181,7 +226,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set tag
         run: echo "TAG=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
