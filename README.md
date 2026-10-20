@@ -33,9 +33,14 @@ explicitly — `--context kind-harbourline` or `--context harbourline-vm`.
 
 ```mermaid
 flowchart LR
-  dev["Developer"] --> gha["GitHub Actions<br/>build · Trivy scan"]
-  gha --> ghcr[("GHCR")]
-  gha -->|"commits image tag"| git[("Git · main")]
+  dev["Developer"] --> pr["Pull request"]
+  pr --> test["test<br/>pytest + Postgres"]
+  test --> sonar["sonar<br/>SonarCloud<br/>quality gate"]
+  sonar --> build["build<br/>image + Trivy"]
+  scan["scan<br/>Trivy fs + config"] --> deploy
+  build --> deploy["deploy<br/>bump image tag"]
+  build --> ghcr[("GHCR")]
+  deploy -->|"commit"| git[("Git · main")]
   git --> argo["Argo CD"]
   argo --> kind["kind cluster"]
   ghcr --> kind
@@ -43,8 +48,16 @@ flowchart LR
   ecr -.-> eks["EKS<br/>(on demand)"]
 ```
 
+**Every stage can refuse.** A failing test, a failed SonarCloud quality gate, a
+HIGH vulnerability or a Kubernetes misconfiguration each stop the pipeline —
+verified by opening a pull request with a known-vulnerable dependency and
+watching it blocked, rather than by assuming.
+
 **No cluster credentials exist in CI.** The pipeline's last step is a commit that
 bumps an image tag; Argo CD pulls. A compromised runner cannot reach a cluster.
+
+**Every action is pinned to a commit SHA**, not a tag. A tag is a mutable label
+the owner can re-point; a SHA is the content.
 
 ---
 
@@ -73,6 +86,15 @@ redirect and BasicAuth · CoreDNS customisation so pods resolve LAN hostnames
 Longhorn across dedicated disks, survived a hard power-off as *Degraded, not
 Faulted* · EBS CSI on EKS with `WaitForFirstConsumer` · PV reclaim policies and
 what `Retain` is actually for
+
+**Testing and delivery gates**
+11 pytest tests — unit via Flask's `test_client`, integration against a **real
+Postgres** service container rather than a mock, because mocking means the SQL
+never runs · a test that asserts a **security property** (`/config` must never
+expose the password), verified by deliberately breaking it · SonarCloud analysis
+with a **blocking quality gate** · Trivy filesystem, config and image scans, all
+**blocking**, with accepted exceptions documented and dated · least-privilege
+per-job `permissions`, deny by default
 
 **Security**
 All workloads hardened — non-root, read-only root filesystem, dropped
@@ -162,6 +184,7 @@ connectivity and row count).
 | [`triage.md`](docs/triage.md) | diagnosing a broken cluster |
 | [`etcd-restore.md`](docs/etcd-restore.md) | snapshot and full restore, performed not just read |
 | [`cluster-state-not-in-git.md`](docs/cluster-state-not-in-git.md) | **every imperative change, and why each one is a landmine** |
+| [`ci-cd.md`](docs/ci-cd.md) | the pipeline: stages, gates, secrets, and how to troubleshoot a failing one |
 
 ---
 
@@ -185,3 +208,16 @@ operated.
 - metrics-server runs with `--kubelet-insecure-tls`; the real fix is
   `serverTLSBootstrap` plus CSR approval.
 - kubeadm certificate renewal has not been exercised.
+- **Nothing validates the application after Argo CD syncs.** The pipeline ends
+  at a commit; whether the deployment actually came up healthy is unverified.
+- **20 Medium SonarCloud security issues have never been triaged.** They are
+  what holds the overall Security rating at C.
+- **The Helm chart is excluded from the config scan** (`skip-dirs: helm`),
+  because Trivy renders it with placeholder defaults no deployment uses.
+  Rendering it with its real values and scanning the output is the proper fix.
+- **SHA-pinned actions never update themselves** — the cost of pinning. Needs
+  Dependabot to bump them and keep the version comments honest.
+- **`build` does not depend on `scan`**, so a Kubernetes misconfiguration fails
+  the pipeline but an image is still published. Nothing deploys it. Making
+  `build` wait would cost parallelism on every run to prevent an orphaned image
+  on rare ones — a deliberate trade-off, not an oversight.
