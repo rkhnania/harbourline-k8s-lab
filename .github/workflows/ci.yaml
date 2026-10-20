@@ -15,7 +15,74 @@ permissions:
   packages: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # web is nginx serving static files - nothing to unit test.
+        component: [api, reports]
+
+    # A real Postgres, not a mock. GitHub starts this container alongside the
+    # job and maps its port onto the runner's localhost. Same shape as running
+    # it on a docker network locally, which is how the suite was developed.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        # Without a health check the job races the database: Postgres accepts
+        # TCP a moment before it will accept queries, so the first test can
+        # fail on timing alone. pg_isready is the real readiness signal.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches python:3.12-slim in the Dockerfiles. Test on the runtime
+          # you ship: the dependencies are pinned against 3.12, and a failure
+          # caused by a different interpreter tells you nothing about the code.
+          python-version: '3.12'
+
+      - name: Install ${{ matrix.component }} dependencies
+        working-directory: ./${{ matrix.component }}
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run ${{ matrix.component }} tests
+        working-directory: ./${{ matrix.component }}
+        env:
+          TEST_DB_HOST: localhost
+          TEST_DB_PASSWORD: postgres
+        run: >-
+          python -m pytest -v
+          --junitxml=test-results.xml
+          --cov=app --cov-report=xml --cov-report=term
+
+      - name: Upload test results and coverage
+        # if: always() - without it this step is skipped when the tests fail,
+        # which is precisely when the report is worth having.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.component }}
+          path: |
+            ${{ matrix.component }}/test-results.xml
+            ${{ matrix.component }}/coverage.xml
+          retention-days: 30
+
   build:
+    # Nothing is built until the tests pass. This is the gate: a failing test
+    # now stops an image from ever being produced, rather than being noticed
+    # after it is deployed.
+    needs: [test]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
