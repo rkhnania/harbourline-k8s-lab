@@ -67,19 +67,27 @@ spec:
               fail=0
 
               # Retries exist because a Service's endpoints can lag a pod
-              # becoming Ready by a second or two. Bounded at ~30s so a real
-              # outage fails the job instead of hanging until the deadline.
+              # becoming Ready by a second or two.
+              #
+              # THE RETRY BUDGET MUST FIT INSIDE activeDeadlineSeconds. First
+              # version used 10 attempts at (5s timeout + 3s sleep) = 80s per
+              # check, 240s for three - against a 180s deadline. Kubernetes
+              # killed the Job mid-run AND deleted its pod, so the logs
+              # explaining the failure were destroyed by the deadline that the
+              # failure caused.
+              #
+              # Now: 5 attempts at (3s + 2s) = 25s per check, 75s for three.
               check() {
                 name="$1"; url="$2"; expect="$3"
                 i=1
-                while [ "$i" -le 10 ]; do
-                  code=$(curl -s -o /tmp/body -w '%{http_code}' --max-time 5 "$url" || echo 000)
+                while [ "$i" -le 5 ]; do
+                  code=$(curl -s -o /tmp/body -w '%{http_code}' --connect-timeout 3 --max-time 3 "$url" || echo 000)
                   if [ "$code" = "200" ] && grep -q "$expect" /tmp/body; then
                     echo "PASS  $name  ($url)"
                     return 0
                   fi
                   i=$((i+1))
-                  sleep 3
+                  sleep 2
                 done
                 echo "FAIL  $name  ($url)"
                 echo "      last status: $code"
