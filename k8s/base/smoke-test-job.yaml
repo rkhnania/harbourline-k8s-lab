@@ -1,0 +1,110 @@
+# Post-deployment validation.
+#
+# WHY THIS RUNS IN THE CLUSTER AND NOT IN CI
+# The pipeline deliberately holds no cluster credentials - its last act is a
+# commit, and Argo CD pulls. That is the best security property of the design:
+# a compromised runner cannot reach a cluster. The cost is that CI cannot check
+# whether the deployment actually worked. So the check runs where the cluster
+# is, triggered by the thing that does the deploying.
+#
+# PostSync: Argo CD runs this AFTER every resource in the sync is applied and
+# reports healthy. If this Job fails, the Argo CD Application goes Degraded -
+# which is the signal that was previously missing entirely.
+#
+# WHAT IT TESTS, AND WHY NOT /health
+# On 2026-10-12 the site rendered its shell and showed "Loading..." forever
+# while web's readiness probe returned 200 the whole time, because that probe
+# fetches a static file. Kubernetes said Healthy, Argo said Healthy, Grafana
+# was clean, and the application was useless.
+#
+# So this does NOT curl /health. It makes the request a BROWSER makes:
+# GET /api/shipments on the web Service, which nginx proxies to the api, which
+# queries Postgres. One request, the whole path. If any link is broken the
+# check fails.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: harbourline-smoke-test
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    # Delete the previous run's Job before creating this one, so each sync
+    # leaves exactly one result to look at rather than a pile of them.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  # No retries. A smoke test that retries until it passes is not a test.
+  # The retry budget lives inside the script, bounded and visible.
+  backoffLimit: 0
+  activeDeadlineSeconds: 180
+  ttlSecondsAfterFinished: 900
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: smoke
+          image: curlimages/curl:8.11.1
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          command:
+            - sh
+            - -c
+            - |
+              set -u
+              fail=0
+
+              # Retries exist because a Service's endpoints can lag a pod
+              # becoming Ready by a second or two. Bounded at ~30s so a real
+              # outage fails the job instead of hanging until the deadline.
+              check() {
+                name="$1"; url="$2"; expect="$3"
+                i=1
+                while [ "$i" -le 10 ]; do
+                  code=$(curl -s -o /tmp/body -w '%{http_code}' --max-time 5 "$url" || echo 000)
+                  if [ "$code" = "200" ] && grep -q "$expect" /tmp/body; then
+                    echo "PASS  $name  ($url)"
+                    return 0
+                  fi
+                  i=$((i+1))
+                  sleep 3
+                done
+                echo "FAIL  $name  ($url)"
+                echo "      last status: $code"
+                echo "      expected to find: $expect"
+                echo "      body (first 300 bytes):"
+                head -c 300 /tmp/body 2>/dev/null || echo "      <empty>"
+                echo
+                fail=1
+              }
+
+              echo "=== Harbourline post-deployment smoke test ==="
+
+              # The front page. Proves nginx is serving its content.
+              check "web serves the page"        "http://harbourline-web/"                      "Harbourline"
+
+              # THE ONE THAT MATTERS: browser -> nginx -> api -> Postgres.
+              # SHP- appears only if a real row came back from the database.
+              check "web -> api -> db"           "http://harbourline-web/api/shipments"         "SHP-"
+
+              # The reports service aggregates over the same table.
+              check "reports aggregates"         "http://harbourline-reports:8080/reports/summary" "total"
+
+              echo
+              if [ "$fail" -ne 0 ]; then
+                echo "SMOKE TEST FAILED - the deployment is not serving correctly"
+                exit 1
+              fi
+              echo "SMOKE TEST PASSED - all paths serving"

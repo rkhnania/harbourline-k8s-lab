@@ -7,6 +7,7 @@ resources:
 - configmap.yaml
 - db-statefulset.yaml
 - db-init-job.yaml
+- smoke-test-job.yaml
 - ingress.yaml
 - networkpolicies.yaml
 
