@@ -24,6 +24,14 @@ spec:
         app: {{ .Values.name }}
         app.kubernetes.io/part-of: {{ .Values.partOf }}
     spec:
+      # Named, per-service subject - never `default`, which cannot be scoped to
+      # one workload.
+      serviceAccountName: {{ .Values.name }}
+      # Set here AND on the ServiceAccount deliberately. The pod-level setting
+      # overrides the ServiceAccount's, so this one is what actually takes
+      # effect; the ServiceAccount's protects any future pod that uses it
+      # without saying so. Either alone leaves a gap.
+      automountServiceAccountToken: false
       imagePullSecrets:
         - name: {{ .Values.imagePullSecret }}
       {{- if .Values.spread.enabled }}
