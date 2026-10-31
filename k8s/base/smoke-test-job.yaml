@@ -81,7 +81,9 @@ spec:
                 name="$1"; url="$2"; expect="$3"
                 i=1
                 while [ "$i" -le 5 ]; do
-                  code=$(curl -s -o /tmp/body -w '%{http_code}' --connect-timeout 3 --max-time 3 "$url" || echo 000)
+                  rm -f /tmp/body
+                  code=$(curl -s -o /tmp/body -w '%{http_code}' --connect-timeout 3 --max-time 3 "$url")
+                  rc=$?
                   if [ "$code" = "200" ] && grep -q "$expect" /tmp/body; then
                     echo "PASS  $name  ($url)"
                     return 0
@@ -89,11 +91,24 @@ spec:
                   i=$((i+1))
                   sleep 2
                 done
+                # curl's EXIT CODE is the diagnosis; the HTTP code is not.
+                # 000 is emitted for "no response" regardless of cause, so the
+                # first version of this test reported 000 for a DNS failure, a
+                # refused connection and a dropped packet alike - three
+                # unrelated faults, one indistinguishable symptom. -s also hid
+                # curl's own message. The exit code survives -s, so use it.
+                case "$rc" in
+                  0)  why="the request arrived - HTTP $code, or the body was wrong" ;;
+                  6)  why="curl 6 - could not resolve host (DNS)" ;;
+                  7)  why="curl 7 - connection refused (reached it; nothing listening)" ;;
+                  28) why="curl 28 - timed out (packets dropped; suspect NetworkPolicy)" ;;
+                  *)  why="curl exit $rc" ;;
+                esac
                 echo "FAIL  $name  ($url)"
-                echo "      last status: $code"
+                echo "      status: $code    diagnosis: $why"
                 echo "      expected to find: $expect"
                 echo "      body (first 300 bytes):"
-                head -c 300 /tmp/body 2>/dev/null || echo "      <empty>"
+                if [ -s /tmp/body ]; then head -c 300 /tmp/body; echo; else echo "      <no body - curl never wrote one>"; fi
                 echo
                 fail=1
               }

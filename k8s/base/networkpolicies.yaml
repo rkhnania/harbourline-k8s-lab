@@ -185,3 +185,89 @@ spec:
       ports:
         - protocol: TCP
           port: 5432
+---
+# 11. The post-deployment smoke test may leave its pod to reach web and reports.
+#
+# TWO WALLS, NOT ONE. default-deny-egress (podSelector {}) stops this pod
+# leaving the namespace's pod network; default-deny-ingress stops web and
+# reports accepting. Granting one direction changes nothing observable - the
+# symptom is an identical timeout - which is the most common NetworkPolicy
+# mistake there is. Policies 11, 12 and 13 are a set; none of them works alone.
+#
+# PORT 8080, NOT 80. The web Service listens on 80 and forwards to pods on
+# 8080. NetworkPolicy peers are PODS, never Services, and the rule is enforced
+# once the Service address has already been translated to a pod address - so
+# the port that matters is the container's. allow-ingress-to-web says 8080 for
+# the same reason, even though nothing addresses web on 8080 directly.
+#
+# NO EGRESS TO api OR db, DELIBERATELY. The test's whole point is to exercise
+# the path a browser takes: web's nginx proxies /api to the api, which queries
+# Postgres. web and api already hold the egress rules for those hops. If the
+# smoke test could reach the api directly it would stop testing the real path.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-smoke-test-egress
+spec:
+  podSelector:
+    matchLabels:
+      job-name: harbourline-smoke-test
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: harbourline-web
+        - podSelector:
+            matchLabels:
+              app: harbourline-reports
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# 12. web may accept the smoke test.
+#
+# A separate policy rather than another peer inside allow-ingress-to-web.
+# NetworkPolicies are additive - a pod is reachable if ANY policy admits the
+# peer - so this grants the same access while leaving the production rule
+# untouched and naming the exception as its own auditable object. Same
+# reasoning as the Kyverno exclude for the database's writable filesystem.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-smoke-test-to-web
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-web
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              job-name: harbourline-smoke-test
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# 13. reports may accept the smoke test.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-smoke-test-to-reports
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-reports
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              job-name: harbourline-smoke-test
+      ports:
+        - protocol: TCP
+          port: 8080
