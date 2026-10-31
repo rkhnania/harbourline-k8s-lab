@@ -1,3 +1,31 @@
+{{- /*
+Post-deployment smoke test. Lives in the CHART, not in k8s/base, because of
+where it has to fire from.
+
+WHY IT MOVED. It was a PostSync hook on the `harbourline` Application, which
+tracks k8s/base. CI deploys by bumping image tags in the three HELM
+Applications - api, web and reports - so k8s/base never changes, never syncs,
+and the hook never fired. It only ever ran when a sync was forced by hand. A
+deployment gate that does not fire on deployments is not a gate.
+
+ENABLED FOR web ONLY (values-web.yaml). All three Applications sync on every
+deploy, so enabling it in the shared values.yaml would run the same test three
+times per deploy for one result. web is the right owner: the test enters
+through web's nginx.
+
+THE CAVEAT, STATED PLAINLY. Argo CD syncs Applications INDEPENDENTLY - there is
+no ordering between them. This hook fires when web's resources are healthy,
+which may be while api is still rolling out. The in-script retry budget (5
+attempts over 25s per check) covers a normal rollout, not a slow one. The real
+fix is one Application with sync waves; this is the honest intermediate step.
+
+THE JOB NAME IS LOAD-BEARING. Hardcoded `harbourline-smoke-test`, not derived
+from .Values.name, because the three NetworkPolicies in
+k8s/base/networkpolicies.yaml select this pod by `job-name:
+harbourline-smoke-test`. Templating the name would silently break them and the
+symptom would be a timeout, not an error.
+*/}}
+{{- if .Values.smokeTest.enabled }}
 # Post-deployment validation.
 #
 # WHY THIS RUNS IN THE CLUSTER AND NOT IN CI
@@ -131,3 +159,4 @@ spec:
                 exit 1
               fi
               echo "SMOKE TEST PASSED - all paths serving"
+{{- end }}

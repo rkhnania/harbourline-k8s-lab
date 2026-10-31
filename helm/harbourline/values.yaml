@@ -74,3 +74,9 @@ spread:
 
 pdb:
   maxUnavailable: 1
+
+# Post-deployment smoke test (templates/smoke-test-job.yaml). OFF by default:
+# all three Applications sync on every deploy, so it is enabled for exactly one
+# of them - web - in values-web.yaml. See the template for the reasoning.
+smokeTest:
+  enabled: false

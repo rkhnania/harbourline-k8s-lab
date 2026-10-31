@@ -48,3 +48,8 @@ livenessProbe:
 service:
   port: 80
   targetPort: 8080
+
+# web owns the post-deployment smoke test: the checks enter through its nginx,
+# and enabling it on exactly one Application means one run per deploy.
+smokeTest:
+  enabled: true
