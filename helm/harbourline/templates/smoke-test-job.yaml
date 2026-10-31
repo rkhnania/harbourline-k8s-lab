@@ -49,6 +49,16 @@ symptom would be a timeout, not an error.
 # GET /api/shipments on the web Service, which nginx proxies to the api, which
 # queries Postgres. One request, the whole path. If any link is broken the
 # check fails.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: harbourline-smoke-test
+  labels:
+    app.kubernetes.io/part-of: {{ .Values.partOf }}
+automountServiceAccountToken: false
+---
+# Not hook-annotated, so it is created during the normal Sync phase and already
+# exists when the PostSync hook below runs.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -67,6 +77,11 @@ spec:
   template:
     spec:
       restartPolicy: Never
+      # This pod runs an arbitrary shell script, which makes it the LAST thing
+      # in the namespace that should hold an API token. It was also the last
+      # one still holding one.
+      serviceAccountName: harbourline-smoke-test
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 100
