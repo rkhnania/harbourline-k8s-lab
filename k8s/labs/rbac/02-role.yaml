@@ -1,0 +1,53 @@
+# RBAC Module 2, step 2: the least-privilege grant.
+#
+# BOTH OBJECTS LIVE IN `harbourline`, NOT `rbac-lab`.
+# Permissions live where the RESOURCES are, not where the subject is. The
+# ServiceAccount is in rbac-lab; the Deployments it needs to read are in
+# harbourline; so the Role and the RoleBinding are in harbourline and the
+# binding reaches across to name a subject from another namespace. This is
+# normal and useful - it is how one platform workload is granted narrow access
+# into several application namespaces, one binding each, with no cluster-wide
+# grant anywhere.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deployment-reporter
+  namespace: harbourline
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list"]
+# WHAT IS DELIBERATELY ABSENT, because absence is the whole design:
+#
+#   no "watch"   - the reporter runs nightly and exits. watch is for
+#                  controllers holding a long-lived connection. Granting a verb
+#                  the workload never calls is pure attack surface.
+#   no "*"       - a wildcard verb includes delete, patch and update, and also
+#                  silently includes every verb added in future Kubernetes
+#                  releases. You cannot review a permission you have not seen.
+#   no "pods"    - it reports replica counts, which live on the Deployment.
+#   no "secrets" - obviously. But note it would be equally absent if this were
+#                  apiGroups: [""] with resources: ["*"].
+#   no ClusterRole - a ClusterRole would grant this in EVERY namespace,
+#                  including kube-system, for a job that needs exactly one.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deployment-reporter
+  namespace: harbourline
+roleRef:
+  # roleRef is IMMUTABLE. To point a binding at a different Role you delete and
+  # recreate it - Kubernetes refuses the edit, on purpose, so a binding cannot
+  # be quietly re-aimed at something more powerful.
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: deployment-reporter
+subjects:
+  - kind: ServiceAccount
+    name: deployment-reporter
+    # The line everyone forgets. Without it the binding looks for a
+    # ServiceAccount called deployment-reporter in `harbourline`, finds
+    # nothing, and silently grants nothing - no error, no warning, no event.
+    # A RoleBinding naming a subject that does not exist is perfectly valid.
+    namespace: rbac-lab
