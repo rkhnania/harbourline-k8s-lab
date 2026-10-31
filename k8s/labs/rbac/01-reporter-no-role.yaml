@@ -1,0 +1,108 @@
+# RBAC Module 2, step 1: a workload that legitimately needs the Kubernetes API,
+# deployed with NO permissions at all. It is meant to fail.
+#
+# THE SCENARIO
+# Platform wants a nightly report of any Deployment in `harbourline` running
+# below its desired replica count, so on-call sees drift before customers do.
+# It runs in-cluster and calls the API. It must be able to do nothing else -
+# because a job that can list Deployments is, if you are careless about how you
+# grant that, also a job that can read the database password.
+#
+# WHY IT RUNS IN ITS OWN NAMESPACE
+# `harbourline` has default-deny egress. Reaching the API server from there
+# needs its own NetworkPolicy, which is a separate problem from the one this
+# lab is about. Putting the reporter in `rbac-lab` also demonstrates something
+# worth knowing: a RoleBinding in ONE namespace can name a ServiceAccount from
+# ANOTHER. Permissions follow the binding's namespace, not the subject's.
+#
+# APPLY MANUALLY. Not referenced by any Argo CD Application - this is a lab,
+# and lab objects that drift into GitOps get pruned at confusing moments.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rbac-lab
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deployment-reporter
+  namespace: rbac-lab
+# TRUE, deliberately, and this is the first one in the project. Module 1 turned
+# automount off everywhere because nothing called the API. This workload does,
+# so it needs the token - and now the question stops being "does it have a
+# credential" and becomes "what can that credential do".
+automountServiceAccountToken: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: reporter-probe
+  namespace: rbac-lab
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 1800
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: deployment-reporter
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: probe
+          image: curlimages/curl:8.11.1
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          command:
+            - sh
+            - -c
+            - |
+              set -u
+              SA=/var/run/secrets/kubernetes.io/serviceaccount
+              API=https://kubernetes.default.svc
+              TOKEN=$(cat $SA/token)
+
+              # No kubectl here on purpose. Talking to the API with curl and
+              # the mounted token shows what that token actually IS: a bearer
+              # credential, presented in an HTTP header, judged by RBAC on
+              # every single request.
+              probe() {
+                desc="$1"; path="$2"
+                code=$(curl -s -o /tmp/out -w '%{http_code}' \
+                  --cacert $SA/ca.crt \
+                  -H "Authorization: Bearer $TOKEN" \
+                  "$API$path")
+                echo "[$code]  $desc"
+                echo "        $path"
+                sed -e 's/^/        /' /tmp/out | head -c 420
+                echo
+                echo
+              }
+
+              echo "=== deployment-reporter, running as ==="
+              echo "system:serviceaccount:$(cat $SA/namespace):deployment-reporter"
+              echo
+
+              # 1. What it is SUPPOSED to be able to do.
+              probe "list Deployments in harbourline" \
+                    "/apis/apps/v1/namespaces/harbourline/deployments"
+
+              # 2. The database password. Must never succeed.
+              probe "read the database Secret" \
+                    "/api/v1/namespaces/harbourline/secrets/harbourline-db-secret"
+
+              # 3. Someone else's namespace. Must never succeed.
+              probe "list Pods in kube-system" \
+                    "/api/v1/namespaces/kube-system/pods"
