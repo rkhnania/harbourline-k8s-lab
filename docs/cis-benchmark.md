@@ -29,8 +29,46 @@ warnings tells you nothing until you know whether those warnings were
 *evaluated* or merely *printed*. Reporting "34 security warnings" from this
 output would be wrong, and an interviewer would catch it.
 
-The 2 genuine FAILs are in the node section. **Not yet captured** - see
-*Outstanding* below.
+## The 2 FAILs
+
+```
+[FAIL] 4.1.1 Ensure that the kubelet service file permissions are set to 600 or
+             more restrictive (Automated)
+[FAIL] 4.1.9 If the kubelet config.yaml configuration file is being used
+             validate permissions set to 600 or more restrictive (Automated)
+```
+
+| Check | File | Wanted | Typical |
+|---|---|---|---|
+| 4.1.1 | `/etc/systemd/system/kubelet.service.d/10-kubeadm.conf` | `600` | `644` |
+| 4.1.9 | `/var/lib/kubelet/config.yaml` | `600` | `644` |
+
+**These are not kind artefacts.** `kubeadm` writes both files world-readable by
+default, so a conventional cluster fails the same two checks - the VM cluster
+almost certainly does. Treat them as real.
+
+**Why it matters.** `644` means any local account on the node can read the
+kubelet's configuration: its TLS settings, authn/authz mode, the
+`staticPodPath`, and the paths to its client certificate and CA. On its own
+that is disclosure, not compromise. It becomes compromise when combined with
+anything that yields a shell on the node - and a cluster that runs third-party
+containers is one container escape away from exactly that. This is a
+defence-in-depth control: it does not stop an attack, it removes a free step.
+
+Verify on any node:
+
+    stat -c '%a %n' /var/lib/kubelet/config.yaml /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+Remediate (per node, as root):
+
+    chmod 600 /var/lib/kubelet/config.yaml
+    chmod 600 /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+No kubelet restart is needed - the mode changes, the content does not. On kind
+the nodes are containers, so reach them with
+`docker exec <node-container> chmod 600 ...`; the change is lost when the
+cluster is recreated, which is itself the argument for fixing it on the VM
+cluster where it persists.
 
 ## Caveat: kind is not a kubeadm cluster
 
@@ -87,6 +125,17 @@ real subjects.
 
 ## Outstanding
 
-- **Capture the 2 FAILs.** `kubectl --context kind-harbourline logs job/kube-bench | grep '^\[FAIL\]'`
-- Re-run on the VM cluster (kubeadm), where control-plane checks are meaningful.
-- Clean up the Job: `kubectl --context kind-harbourline delete job kube-bench`
+- **Remediate 4.1.1 and 4.1.9 on the VM cluster**, where the fix persists and
+  the nodes are real. Not yet done on either cluster.
+- Re-run there (kubeadm), where the control-plane section is meaningful.
+- Verify the 5.1.7-5.1.13 RBAC escalation checks - Module 2.
+
+## Corrections to the first reading of this run
+
+Recorded because the mistake is instructive, not for completeness.
+
+The control-plane and node sections were initially dismissed as kind artefacts.
+Both FAILs turned out to be genuine and portable: `kubeadm` writes those files
+`644` on any cluster. **"The test environment explains it" is a hypothesis, not
+a finding** - and it is the one that quietly discards real results. Check the
+default before blaming the lab.
