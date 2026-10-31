@@ -25,6 +25,8 @@ spec:
       labels:
         app: harbourline-db
     spec:
+      serviceAccountName: harbourline-db
+      automountServiceAccountToken: false
       nodeSelector:
         tier: database
       securityContext:

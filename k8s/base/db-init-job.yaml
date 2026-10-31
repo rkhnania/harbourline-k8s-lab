@@ -12,6 +12,8 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      serviceAccountName: harbourline-db-init
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 70
