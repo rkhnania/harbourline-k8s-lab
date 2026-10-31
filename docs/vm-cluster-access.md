@@ -33,7 +33,7 @@ holds `192.168.0.241` and routes by `Host` header. Routing is declared in
 | Service | URL | User | Password |
 |---|---|---|---|
 | Argo CD | https://argocd.hl.internal | `admin` | see below |
-| Longhorn UI | https://longhorn.hl.internal | `admin` | BasicAuth, set at secret creation |
+| Longhorn UI | https://longhorn.hl.internal | `admin` | BasicAuth - **cannot be read back**, see below |
 | Prometheus | https://prometheus.hl.internal | - | **none - known gap, see Security** |
 
 **No credentials are stored in this repository.**
@@ -148,6 +148,70 @@ kubectl --context harbourline-vm -n argocd rollout restart deploy/argocd-server
 
 Wait about 45 seconds, then read the new password with the command above.
 
+## Longhorn UI password
+
+**It cannot be read back.** The `longhorn-basic-auth` Secret holds an `apr1`
+hash, which is one-way - nothing in the cluster, and nobody, knows the
+plaintext. There is no bootstrap Secret to fall back on, unlike Argo CD. If you
+do not remember it, setting a new one is the only option. Do not go looking.
+
+### Set or reset it - one command
+
+Change the password on the first line and run the whole thing. It writes the
+Secret, waits for Traefik to reload it, then logs in with the password it just
+set and prints the result.
+
+```
+LHPW='Harbourline2026' && printf 'admin:%s\n' "$(openssl passwd -apr1 "$LHPW")" > /tmp/users && kubectl --context harbourline-vm -n longhorn-system create secret generic longhorn-basic-auth --from-file=/tmp/users --dry-run=client -o yaml | kubectl --context harbourline-vm -n longhorn-system apply -f - && rm -f /tmp/users && sleep 5 && curl -k -s -o /dev/null -w 'login test: %{http_code}\n' -u admin:"$LHPW" https://longhorn.hl.internal/
+```
+
+`login test: 200` - done. Log in as `admin` with that password **in an incognito
+window**. A normal tab caches BasicAuth credentials per origin and keeps
+replaying the old ones, which is indistinguishable from a wrong password.
+
+`login test: 401` on a password you just set means Traefik is holding a stale
+copy of the Secret:
+
+```
+kubectl --context harbourline-vm -n traefik rollout restart deploy/traefik
+```
+
+### Two things that cause a permanent 401
+
+- **The Secret's key must be exactly `users`.** Traefik ignores any other key,
+  so a Secret built with `--from-file=auth` authenticates nobody, whatever
+  password you type. Check with
+  `kubectl --context harbourline-vm -n longhorn-system get secret longhorn-basic-auth -o jsonpath='{.data}'`.
+- **`create --dry-run=client -o yaml | apply -f -` is not decoration.**
+  `kubectl create secret` refuses to touch an object that already exists, and
+  `kubectl apply` cannot build a Secret from a file. Neither rotates a
+  file-based Secret alone, so `create` renders the YAML without sending it and
+  `apply` submits it.
+
+### Is the password wrong, or is the proxy stale?
+
+A BasicAuth `401` has two causes that look identical. Hash the candidate
+password against the **stored salt** to tell them apart - it is the only thing
+that does. Read the stored line:
+
+```
+kubectl --context harbourline-vm -n longhorn-system get secret longhorn-basic-auth -o jsonpath='{.data.users}' | base64 -d
+```
+
+It looks like `admin:$apr1$<salt>$<digest>`. Take the salt - the field between
+the second and third `$` - and recompute:
+
+```
+openssl passwd -apr1 -salt '<salt>' '<candidate password>'
+```
+
+Same digest means the password is correct and the fault is Traefik or the
+browser cache. Different digest means the password is wrong, and no amount of
+restarting will help.
+
+**Debt:** `apr1` is Apache's MD5 variant. Traefik also accepts bcrypt, which is
+stronger - `htpasswd -nbB admin "$LHPW"` produces it.
+
 ## Gotchas
 
 - **`argocd-server` runs with `--insecure`.** It speaks plain HTTP inside the
@@ -161,7 +225,10 @@ Wait about 45 seconds, then read the new password with the command above.
   nothing at that address; **reset = listening, but rejected what you sent**.
 - **The Longhorn UI is behind BasicAuth** (Traefik `Middleware`, credentials in
   the `longhorn-basic-auth` Secret, never in Git). It previously had no
-  authentication at all while reachable by anything on the LAN.
+  authentication at all while reachable by anything on the LAN. Longhorn itself
+  has no authentication whatsoever - that Middleware is the entire protection,
+  and anything that bypasses it can delete volumes and backups. The password
+  **cannot be recovered**, only replaced: see *Longhorn UI password*.
 - `argocd-application-controller` is a **StatefulSet**, not a Deployment - a
   deliberate singleton so two controllers never fight over the same Application.
   `kubectl rollout restart deploy/...` will not match it.
