@@ -75,11 +75,31 @@ that this stack has no way to name the working cluster. State files have been
 pointed at the wrong environment by people with far more experience than
 whoever reads this.
 
-**No `kubernetes` provider.** `kubernetes_manifest` performs a server-side
-dry-run at **plan** time, against a cluster this same apply has not created
-yet. The root Application therefore goes in through the chart's `extraObjects`.
-Side benefit: the Application is owned by the Helm release, so `destroy` removes
-it in the right order instead of leaving an orphan that fights the teardown.
+**Three resources, not two: CRD-then-CR always needs two steps.**
+
+`kubernetes_manifest` performs a server-side dry-run at **plan** time, against
+a cluster this same apply has not created yet, so it cannot create the root
+Application. The first attempt avoided that by putting the Application in the
+argo-cd release's `extraObjects` - and failed:
+
+    Error: unable to build kubernetes objects from release manifest:
+    resource mapping not found for name: "root" namespace: "argocd"
+    no matches for kind "Application" in version "argoproj.io/v1alpha1"
+    ensure CRDs are installed first
+
+Same class of problem, different door. Helm builds **every** manifest in a
+release against API discovery before applying **any** of them, so one release
+cannot both install a CRD and create a custom resource of that kind.
+
+The fix is a second Helm release from a one-template local chart
+(`charts/root-app`), ordered with `depends_on`. This is worth internalising:
+in Terraform and Kubernetes, a custom resource and the CRD that defines it
+cannot be created in the same step. Every workaround - two applies, two
+releases, `-target`, the `kubectl` provider - is a way of saying the same
+thing.
+
+The Application still ends up owned by a Helm release, so `destroy` removes it
+in the right order rather than orphaning everything beneath it.
 
 **`.terraform.lock.hcl` is committed.** The constraints in `versions.tf` say
 what is *acceptable*; the lock file records what was *selected*, with

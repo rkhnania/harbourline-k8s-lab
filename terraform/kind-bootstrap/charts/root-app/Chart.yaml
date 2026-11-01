@@ -1,0 +1,12 @@
+apiVersion: v2
+name: root-app
+description: |
+  The single Argo CD Application that hands this cluster over to GitOps.
+
+  It is a chart of its own, rather than an extraObject on the argo-cd release,
+  because Helm builds every manifest in a release against API discovery before
+  applying any of them. A release cannot both install a CRD and create a custom
+  resource of that kind - the CR fails to map while the CRD is still only a
+  manifest. Two releases, ordered by depends_on, is the fix.
+type: application
+version: 0.1.0

@@ -21,11 +21,11 @@ resource "kind_cluster" "this" {
   }
 }
 
-# Provider configured from the cluster this same apply creates. Terraform
-# resolves the dependency, but it is the reason the kubernetes provider is not
-# used here: kubernetes_manifest performs a server-side dry-run at PLAN time,
-# against a cluster that does not exist yet. The root Application therefore
-# goes in through the chart rather than as its own resource.
+# Provider configured from the cluster this same apply creates.
+#
+# The kubernetes provider is absent for a specific reason: kubernetes_manifest
+# performs a server-side dry-run at PLAN time, against a cluster this apply has
+# not created yet, so it cannot be used to create the root Application here.
 provider "helm" {
   kubernetes {
     host                   = kind_cluster.this.endpoint
@@ -60,43 +60,38 @@ resource "helm_release" "argocd" {
         "server.insecure" = true
       }
     }
+  })]
+}
 
-    # THE HANDOVER. One object. Everything else in the cluster arrives because
-    # Argo CD pulled it from Git, not because Terraform pushed it.
-    #
-    # It is declared through the chart rather than as a kubernetes_manifest for
-    # the plan-time reason above, and it has a pleasant side effect: the
-    # Application is owned by the Helm release, so `terraform destroy` removes
-    # it in the right order instead of leaving an orphan that fights the
-    # teardown.
-    extraObjects = [
-      {
-        apiVersion = "argoproj.io/v1alpha1"
-        kind       = "Application"
-        metadata = {
-          name       = "root"
-          namespace  = "argocd"
-          finalizers = ["resources-finalizer.argocd.argoproj.io"]
-        }
-        spec = {
-          project = "default"
-          source = {
-            repoURL        = var.repo_url
-            targetRevision = var.target_revision
-            path           = var.apps_path
-          }
-          destination = {
-            server    = "https://kubernetes.default.svc"
-            namespace = "argocd"
-          }
-          syncPolicy = {
-            automated = {
-              prune    = true
-              selfHeal = true
-            }
-          }
-        }
-      }
-    ]
+# ── The handover ─────────────────────────────────────────────────────────────
+#
+# ONE object: the Application that points Argo CD at this repository.
+# Everything else in the cluster arrives because Argo CD pulled it.
+#
+# WHY A SEPARATE RELEASE, AND NOT extraObjects ON THE ARGO CD RELEASE
+# That was the first attempt and it failed:
+#
+#   Error: unable to build kubernetes objects from release manifest:
+#   resource mapping not found for name: "root" ... no matches for kind
+#   "Application" in version "argoproj.io/v1alpha1" - ensure CRDs are
+#   installed first
+#
+# Helm builds every manifest in a release against API discovery BEFORE
+# applying any of them, so a release cannot both install a CRD and create a
+# custom resource of that kind. Same class of problem as kubernetes_manifest's
+# plan-time dry-run, reached through a different door: in Terraform and
+# Kubernetes, CRD-then-CR always needs two steps. depends_on is what orders
+# them.
+resource "helm_release" "root_app" {
+  name      = "root-app"
+  chart     = "${path.module}/charts/root-app"
+  namespace = "argocd"
+
+  depends_on = [helm_release.argocd]
+
+  values = [yamlencode({
+    repoURL        = var.repo_url
+    targetRevision = var.target_revision
+    path           = var.apps_path
   })]
 }
