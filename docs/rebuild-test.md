@@ -20,7 +20,7 @@ pulling the full app-of-apps from `main`, with no manual step between.
 | `harbourline` | Synced | Progressing | waiting on the database |
 | `harbourline-api` | Synced | Progressing | `ImagePullBackOff` ×3 |
 | `harbourline-reports` | Synced | **Degraded** | `CreateContainerConfigError` |
-| `platform` | **OutOfSync** | Progressing | not yet diagnosed |
+| `platform` | **OutOfSync** | Sync failed | `namespaces "monitoring" not found` |
 
 ```
 harbourline-api-bfc886d78-*        ImagePullBackOff
@@ -68,15 +68,61 @@ hook and errored, on a cluster where the application genuinely does not serve.
 Built on 2026-10-25, first fired against a real broken deployment today, and it
 caught it. A gate that has only ever seen a working system is an untested gate.
 
+## The fourth gap: namespaces created as a side effect
+
+```
+one or more synchronization tasks completed unsuccessfully,
+reason: namespaces "monitoring" not found (retried 5 times)
+```
+
+`k8s/platform` holds two Ingresses. `grafana-ingress.yaml` targets the
+`monitoring` namespace, which does not exist here - because
+kube-prometheus-stack, Loki and Alloy were installed **by hand**, and the
+namespace was a side effect of a `helm install` nobody recorded.
+
+**Git contains the front door to a building that is not there.**
+
+This is a different category from the other three. Secrets and node labels are
+*known* unreproducible state, written down deliberately. This is *invisible*
+state: a namespace that exists on the working cluster because of a command
+someone ran in September, with nothing anywhere recording that the platform
+layer depends on it.
+
+### Why `CreateNamespace=true` is the wrong fix
+
+Adding it to the Application's `syncOptions` makes the sync go green in about
+ten seconds. It would also create an empty `monitoring` namespace containing an
+Ingress that routes to a Grafana which does not exist.
+
+**That converts a loud, accurate failure into a silent misconfiguration.** The
+sync status would say everything is fine; the cluster would serve a 503 to
+anyone who used the hostname. The current red status is carrying true
+information - *the monitoring stack is not in Git* - and the value of a signal
+is destroyed by silencing it rather than answering it.
+
+The real fix is already on the backlog: bring kube-prometheus-stack, Loki,
+Alloy and Kyverno under Argo CD. Until then this Application should stay red,
+because it is right.
+
 ## Open
 
-- **`platform` is OutOfSync** and has not been diagnosed. The kind cluster's
-  platform layer assumes ingress-nginx and other components this stack does not
-  install.
-- **The three secrets remain the whole gap.** Until they can be recreated from
-  code - sealed-secrets, External Secrets Operator, or Vault - "a stranger can
-  rebuild this" is false, and this test measures exactly how false: one node
-  label and three secrets.
+- **Bring the hand-installed Helm releases under Argo CD** - kube-prometheus-
+  stack, Loki, Alloy, Kyverno. This is what `platform` is failing to tell us,
+  and it is the same gap Kyverno was installed to close, one layer up.
+- **The secrets.** Until they can be recreated from code - sealed-secrets,
+  External Secrets Operator, or Vault - "a stranger can rebuild this" is false.
+
+## The gap, measured
+
+Not a feeling. Four things stand between this repository and a working cluster:
+
+1. Three secrets created by hand
+2. One node label (`tier=database`)
+3. One namespace created as a side effect of an unrecorded `helm install`
+4. One container image whose registry visibility differs from its siblings
+
+Everything else - every manifest, every Helm value, the Argo CD install, the
+cluster itself - rebuilt from `main` in four minutes with no human step.
 
 ## Why this matters more than the Terraform
 
