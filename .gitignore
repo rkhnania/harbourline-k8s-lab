@@ -18,3 +18,16 @@ venv/
 .DS_Store
 k8s/secret.yaml
 etcd-snapshot.db
+
+# Terraform
+# The lock file IS committed - it is what pins provider versions with
+# checksums, and without it two people on the same commit can get different
+# providers. Everything below is either a local cache or state containing
+# cluster credentials in plaintext.
+.terraform/
+*.tfstate
+*.tfstate.*
+!.terraform.lock.hcl
+crash.log
+*.tfvars
+!*.tfvars.example
