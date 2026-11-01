@@ -12,6 +12,24 @@ terraform apply
 
 Four minutes. `terraform destroy` removes the cluster entirely.
 
+## Accessing Argo CD on this cluster
+
+No Ingress controller here, so there is no hostname - it needs a port-forward,
+run **in WSL**, left running in its own terminal:
+
+```
+kubectl --context kind-harbourline-tf -n argocd port-forward --address 0.0.0.0 svc/argocd-server 8080:80
+```
+
+Then **http://localhost:8080**, user `admin`, password from a *second* tab:
+
+```
+kubectl --context kind-harbourline-tf -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo
+```
+
+Full notes, including why "Failed to load data" is almost never a broken
+cluster: [`docs/kind-cluster-access.md`](../../docs/kind-cluster-access.md).
+
 ## What this owns, and where it stops
 
 | Owner | Scope |
