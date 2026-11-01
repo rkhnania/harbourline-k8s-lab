@@ -9,6 +9,11 @@ The application is deliberately small. The interesting part is everything around
 it — delivery, storage, networking, policy, observability, and what happens when
 each of those breaks.
 
+A fourth, disposable cluster is built **from nothing by Terraform** in four
+minutes, to test whether any of this is actually reproducible. It is — except
+for [four things](docs/rebuild-test.md), each of them named and measured rather
+than guessed at.
+
 ---
 
 ## Environments
@@ -24,8 +29,15 @@ each of those breaks.
 | Purpose | GitOps, apps, policy, logging | what Kubernetes is *made of* | cloud integration |
 | Cost | £0 | £0 | **destroyed after every session** |
 
-Both local clusters live in one kubeconfig, so every command names its context
-explicitly — `--context kind-harbourline` or `--context harbourline-vm`.
+A fifth environment exists on demand: **`kind-harbourline-tf`**, created by
+[`terraform/kind-bootstrap`](terraform/kind-bootstrap/) — a cluster, Argo CD,
+and one Application that hands everything else over to GitOps. `terraform
+destroy` removes it; `apply` brings it back in four minutes.
+
+Every command names its context explicitly — `--context kind-harbourline`,
+`--context harbourline-vm`, `--context kind-harbourline-tf`. The lab cluster is
+registered **only in WSL's kubeconfig**; see
+[`docs/kind-cluster-access.md`](docs/kind-cluster-access.md).
 
 ---
 
@@ -43,6 +55,7 @@ flowchart LR
   deploy -->|"commit"| git[("Git · main")]
   git --> argo["Argo CD"]
   argo --> kind["kind cluster"]
+  argo --> smoke["smoke test<br/>PostSync hook"]
   ghcr --> kind
   dev -.->|"docker push"| ecr[("Amazon ECR")]
   ecr -.-> eks["EKS<br/>(on demand)"]
@@ -58,6 +71,13 @@ bumps an image tag; Argo CD pulls. A compromised runner cannot reach a cluster.
 
 **Every action is pinned to a commit SHA**, not a tag. A tag is a mutable label
 the owner can re-point; a SHA is the content.
+
+**The deployment is validated inside the cluster**, not by CI — which holds no
+credentials and cannot look. A `PostSync` hook requests `/api/shipments` through
+the real front door, so nginx, the API and Postgres are all exercised by one
+request. If it fails the Application goes red. It was built because on 12
+October the site showed "Loading…" for hours while every health signal stayed
+green.
 
 ---
 
@@ -106,6 +126,15 @@ and config scanning in CI · Secret encryption at rest · RBAC
 kube-prometheus-stack on both clusters, **one Grafana** reading both · Loki +
 Alloy for logs · the `up == 0` query that exposes silently-missing scrape targets
 
+**Infrastructure as code**
+Terraform builds a cluster, installs Argo CD and hands over — **the boundary is
+the design**: Argo CD manages everything *except itself*, because two owners of
+one field is permanent drift with both parties correct · provider versions
+pinned by committed lock file, not by constraint · a CRD and a custom resource
+of that kind cannot be created in one step, learned by walking into it from both
+directions · a **rebuild test** that turned "we use GitOps" into four named,
+measured gaps
+
 **Cloud**
 Full `Developer → image → ECR → EKS → Load Balancer → Application` flow, verified
 end to end · IRSA · a `teardown-check.sh` that fails loudly if anything is still
@@ -126,6 +155,8 @@ k8s/policies/            Kyverno ClusterPolicy
 k8s/kind/                CoreDNS customisation (applied by hand, not by Argo)
 k8s/vm-cluster/          MetalLB, Longhorn, Traefik, platform Ingresses
 k8s/eks/                 eksctl ClusterConfig, app manifests, teardown check
+k8s/labs/rbac/           RBAC labs and a privileged-permission audit
+terraform/kind-bootstrap/  a cluster + Argo CD, from nothing, in four minutes
 docs/                    architecture, security decisions, runbooks
 tools/                   node prep, a kubectl plugin, a network probe
 ```
@@ -142,10 +173,16 @@ tools/                   node prep, a kubectl plugin, a network probe
 | Argo CD — VM platform | `https://argocd.hl.internal` | VM |
 | Longhorn | `https://longhorn.hl.internal` | VM |
 | Prometheus | `https://prometheus.hl.internal` | VM |
+| Argo CD — Terraform lab | `http://localhost:8080` (port-forward) | `kind-harbourline-tf` |
 
 `*.hl.internal` resolves through the workstation's hosts file **and** the kind
 cluster's CoreDNS — browsers and pods are different clients and resolve
 differently. See [`docs/vm-cluster-access.md`](docs/vm-cluster-access.md).
+
+The Terraform lab cluster has no Ingress, so it needs a port-forward and is
+reachable from WSL only —
+[`docs/kind-cluster-access.md`](docs/kind-cluster-access.md) covers both kind
+clusters and the failure modes that look like a broken cluster but are not.
 
 ---
 
@@ -185,6 +222,10 @@ connectivity and row count).
 | [`etcd-restore.md`](docs/etcd-restore.md) | snapshot and full restore, performed not just read |
 | [`cluster-state-not-in-git.md`](docs/cluster-state-not-in-git.md) | **every imperative change, and why each one is a landmine** |
 | [`ci-cd.md`](docs/ci-cd.md) | the pipeline: stages, gates, secrets, and how to troubleshoot a failing one |
+| [`kind-cluster-access.md`](docs/kind-cluster-access.md) | reaching both kind clusters; why a dead port-forward looks like a crash |
+| [`rebuild-test.md`](docs/rebuild-test.md) | **building this from nothing, and the four things that did not come back** |
+| [`cis-benchmark.md`](docs/cis-benchmark.md) | kube-bench, and why 34 warnings were not 34 findings |
+| [`rbac-audit.md`](docs/rbac-audit.md) | who holds the permissions that grant more permissions |
 
 ---
 
@@ -208,8 +249,17 @@ operated.
 - metrics-server runs with `--kubelet-insecure-tls`; the real fix is
   `serverTLSBootstrap` plus CSR approval.
 - kubeadm certificate renewal has not been exercised.
-- **Nothing validates the application after Argo CD syncs.** The pipeline ends
-  at a commit; whether the deployment actually came up healthy is unverified.
+- **Four things stand between this repository and a working cluster**, found by
+  [rebuilding it from nothing](docs/rebuild-test.md): three hand-made secrets, a
+  node label (`tier=database`), a namespace created as a side effect of an
+  unrecorded `helm install`, and one image whose registry visibility differs
+  from its siblings. Everything else rebuilt from `main` with no human step.
+- **Headlamp's ServiceAccount is bound to `cluster-admin`** — the only
+  non-built-in subject there. Not yet a decision; currently a default.
+- **`platform` is deliberately left failing** on the rebuilt cluster.
+  `CreateNamespace=true` would turn it green and leave an Ingress routing to a
+  Grafana that does not exist — a loud accurate failure converted into a silent
+  misconfiguration. It stays red until the monitoring stack is in Git.
 - **20 Medium SonarCloud security issues have never been triaged.** They are
   what holds the overall Security rating at C.
 - **The Helm chart is excluded from the config scan** (`skip-dirs: helm`),
