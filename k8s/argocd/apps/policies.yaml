@@ -1,0 +1,32 @@
+# The project's own Kyverno policies.
+#
+# Hand-applied since 15 October - found on 2026-11-07 while looking for what
+# else in this cluster had no Application. The policies that enforce the
+# security decisions were themselves outside GitOps, which is the same gap
+# they were written to close, one level up.
+#
+# Separate from the kyverno Application on purpose: the engine and the rules
+# have different risk profiles and different change rates. A bad policy should
+# be revertable without touching the admission controller that enforces it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: policies
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rkhnania/harbourline-k8s-lab.git
+    targetRevision: main
+    path: k8s/policies
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+  syncPolicy:
+    automated:
+      # prune ON here, unlike the Helm releases. These are custom resources
+      # with no storage behind them: deleting a policy from Git should remove
+      # it from the cluster, and that is the whole point of managing them
+      # this way.
+      prune: true
+      selfHeal: true

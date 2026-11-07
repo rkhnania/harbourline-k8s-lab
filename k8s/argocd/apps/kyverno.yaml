@@ -1,0 +1,57 @@
+# Kyverno - policy engine and admission webhook.
+#
+# THE RISKIEST OF THE FIVE ADOPTIONS, for a reason that has nothing to do with
+# Kyverno being complicated. Its Enforce rules attach to a webhook with
+# failurePolicy: Fail. If Kyverno is unavailable, the API server has nothing to
+# ask, and it refuses the request. The failure mode is not "policy stops being
+# enforced" - it is "nothing can be created in this cluster", including the
+# pods that would bring Kyverno back.
+#
+# So: automated sync is OFF until a human has read the diff and pressed Sync.
+#
+# `helm get values kyverno` returned null on 2026-11-07 - the release was
+# installed with pure chart defaults, so there is no values file and nothing
+# to reconcile beyond the chart itself.
+#
+# IGNOREDIFFERENCES IS LOAD-BEARING, NOT TIDINESS
+# Kyverno writes its own webhook configurations at runtime: it adds and removes
+# rules from them as policies are created and deleted, and rewrites the CA
+# bundle when its certificate rotates. The chart ships those objects nearly
+# empty and expects Kyverno to fill them in.
+#
+# Without the exclusions below, Argo CD sees Kyverno's runtime edits as drift
+# and reverts them. With selfHeal on, that becomes a loop: Kyverno writes the
+# webhook, Argo CD wipes it, admission silently stops being enforced, Kyverno
+# writes it again. The cluster looks healthy throughout.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyverno
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://kyverno.github.io/kyverno/
+    chart: kyverno
+    targetRevision: 3.9.1 # matches the live release (app v1.19.1)
+    helm:
+      releaseName: kyverno
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyverno
+
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks
+
+  syncPolicy:
+    syncOptions:
+      # Kyverno's CRDs are large enough to exceed the 262144-byte annotation
+      # limit on a client-side apply.
+      - ServerSideApply=true
