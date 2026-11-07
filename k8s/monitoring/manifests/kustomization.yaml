@@ -1,0 +1,14 @@
+# Objects that are APPLIED to the monitoring namespace.
+#
+# Kept separate from the Helm values files one directory up, which are INPUTS
+# to charts and are not Kubernetes objects. An Argo CD Application pointed at a
+# directory tries to apply everything it finds, so a values file sitting
+# alongside a manifest is a sync failure waiting to happen.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - grafana-admin-sealedsecret.yaml
+  - vm-cluster-datasource.yaml

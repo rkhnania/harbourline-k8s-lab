@@ -1,0 +1,32 @@
+# Objects applied into the monitoring namespace: the sealed Grafana admin
+# credentials, and the VM cluster's Prometheus datasource.
+#
+# Both were previously applied by hand. The datasource ConfigMap had been
+# sitting in Git since 2026-10-16 with nothing to apply it - found on
+# 2026-11-07 while looking for somewhere to put the sealed secret.
+#
+# SEPARATE FROM THE HELM RELEASES ON PURPOSE. This Application must sync
+# BEFORE kube-prometheus-stack is pointed at the sealed credentials, or
+# Grafana starts, finds no Secret named grafana-admin, and CrashLoopBackOffs
+# on a missing env var.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-config
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rkhnania/harbourline-k8s-lab.git
+    targetRevision: main
+    path: k8s/monitoring/manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      # prune OFF while the monitoring stack is still hand-installed. Argo CD
+      # does not yet own those objects, and prune deletes what it does not
+      # recognise - which on 2026-10-16 is exactly how a Grafana PVC was lost.
+      prune: false
+      selfHeal: true
