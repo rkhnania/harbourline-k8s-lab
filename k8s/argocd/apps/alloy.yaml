@@ -1,0 +1,31 @@
+# Grafana Alloy - DaemonSet shipping pod logs to Loki.
+#
+# Its values were recovered from the live release on 2026-11-07; nothing was
+# in Git. See k8s/monitoring/alloy-values.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: alloy
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: alloy
+      targetRevision: 1.13.1 # matches the live release
+      helm:
+        releaseName: alloy
+        valueFiles:
+          - $values/k8s/monitoring/alloy-values.yaml
+    - repoURL: https://github.com/rkhnania/harbourline-k8s-lab.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

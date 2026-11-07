@@ -1,0 +1,37 @@
+# Loki - log storage, SingleBinary mode.
+#
+# The safest of the four adoptions: `helm get values loki` and
+# k8s/monitoring/loki-values.yaml were compared on 2026-11-07 and found
+# IDENTICAL across all 37 settings. Git already described reality exactly, so
+# this Application changes nothing - it only puts a running release under
+# management.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      chart: loki
+      targetRevision: 7.3.0 # matches the live release
+      helm:
+        releaseName: loki
+        valueFiles:
+          - $values/k8s/monitoring/loki-values.yaml
+    - repoURL: https://github.com/rkhnania/harbourline-k8s-lab.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      # prune OFF. Loki's SingleBinary PVC holds the logs. Chart-templated
+      # PVCs belong to the release, and a prune that no longer sees one
+      # deletes it - which is how a Grafana PVC was lost on 2026-10-16.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

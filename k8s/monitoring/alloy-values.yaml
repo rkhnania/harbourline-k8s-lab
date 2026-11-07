@@ -1,0 +1,56 @@
+# Grafana Alloy - the log collector that ships pod logs to Loki.
+#
+# RECOVERED FROM THE CLUSTER ON 2026-11-07, not written from scratch. There was
+# no values file for Alloy anywhere in Git; its entire configuration existed
+# only inside the Helm release, recovered with `helm get values alloy`. Of the
+# four releases in this namespace it was the only one with nothing committed at
+# all.
+#
+# Four labels, deliberately. Loki indexes labels, not content, so a label with
+# many distinct values (a request ID, a trace ID) creates a stream per value
+# and the index explodes. namespace/pod/container/app is enough to find
+# anything; the rest is a full-text search away.
+#
+# No control-plane logs: the DaemonSet has no toleration for the control-plane
+# taint, so Alloy runs on the two workers only.
+alloy:
+  configMap:
+    content: |
+      discovery.kubernetes "pods" {
+        role = "pod"
+      }
+
+      discovery.relabel "pods" {
+        targets = discovery.kubernetes.pods.targets
+        rule {
+          source_labels = ["__meta_kubernetes_namespace"]
+          target_label  = "namespace"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_name"]
+          target_label  = "pod"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_container_name"]
+          target_label  = "container"
+        }
+        rule {
+          source_labels = ["__meta_kubernetes_pod_label_app"]
+          target_label  = "app"
+        }
+      }
+
+      loki.source.kubernetes "pods" {
+        targets    = discovery.relabel.pods.output
+        forward_to = [loki.write.default.receiver]
+      }
+
+      loki.write "default" {
+        endpoint {
+          url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"
+        }
+      }
+  mounts:
+    varlog: true
+controller:
+  type: daemonset
