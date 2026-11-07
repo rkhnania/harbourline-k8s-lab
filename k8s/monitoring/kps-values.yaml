@@ -1,12 +1,19 @@
-# kube-prometheus-stack values for the local kind lab.
-# Install:
-#   helm install kps prometheus-community/kube-prometheus-stack \
-#     -n monitoring --create-namespace \
-#     -f kps-values.yaml \
-#     --set grafana.adminPassword="$GRAFANA_PASSWORD"
+# kube-prometheus-stack values for the kind cluster.
 #
-# adminPassword is deliberately NOT stored here — pass it at install time.
-# In the capstone this moves to a Secret managed outside Git.
+# Applied by Argo CD (k8s/argocd/apps/kps.yaml), not by `helm install`. The
+# chart comes from the upstream repository; this file is pulled from Git as a
+# second source. There is no install command to run and no --set to remember.
+#
+# THE ADMIN PASSWORD
+# Until 2026-11-07 this file carried a comment saying the password was
+# "deliberately NOT stored here - pass it at install time". Correct discipline,
+# and fatal to GitOps: there IS no install time. Argo CD renders what is in
+# Git and nothing else.
+#
+# It now comes from a SealedSecret - encrypted ciphertext committed at
+# k8s/monitoring/manifests/, decryptable only by this cluster's controller.
+# The monitoring-config Application must sync first or Grafana starts, finds
+# no Secret, and fails on a missing env var.
 
 prometheus:
   prometheusSpec:
@@ -17,6 +24,12 @@ prometheus:
 
 grafana:
   defaultDashboardsTimezone: Australia/Sydney
+  admin:
+    # Keys as written by kubeseal; they are the chart's defaults, so userKey
+    # and passwordKey do not need overriding.
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
 
 alertmanager:
   enabled: true

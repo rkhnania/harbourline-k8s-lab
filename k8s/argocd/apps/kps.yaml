@@ -1,0 +1,56 @@
+# kube-prometheus-stack - Prometheus, Alertmanager, Grafana, node-exporter,
+# kube-state-metrics and the Prometheus Operator.
+#
+# BROWNFIELD ADOPTION. This release already exists, installed by hand with
+# `helm install` on 2026-09-27. Argo CD is taking over something that is
+# running and serving, which is the hard direction.
+#
+# AUTOMATED SYNC IS DELIBERATELY ABSENT.
+# Nothing happens until a human presses Sync. Before that, Argo CD will show
+# the diff between what Git says and what is actually running - and on
+# 2026-11-07 those were known to differ: `helm get values kps` had no
+# defaultDashboardsTimezone, so Grafana has been rendering in UTC while this
+# file has claimed Australia/Sydney since 15 October. The documented install
+# command was not the one that was used.
+#
+# Review the diff, then sync, then turn automation on. Not before.
+#
+# releaseName: kps is load-bearing. Argo CD names rendered resources after the
+# release; without it they would be named after this Application and Argo
+# would create a parallel set of objects beside the live ones rather than
+# adopting them.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kps
+  namespace: argocd
+spec:
+  project: default
+
+  # Two sources: the chart from upstream, the values from this repository.
+  # $values resolves to the source carrying `ref: values`.
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 91.7.0 # matches the live release exactly - adopt first, upgrade later
+      helm:
+        releaseName: kps
+        valueFiles:
+          - $values/k8s/monitoring/kps-values.yaml
+    - repoURL: https://github.com/rkhnania/harbourline-k8s-lab.git
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    syncOptions:
+      # kube-prometheus-stack's CRDs are enormous. A client-side apply stores
+      # the whole previous object in the last-applied-configuration
+      # annotation, which exceeds Kubernetes' 262144-byte annotation limit and
+      # fails with "Too long". Server-side apply does not use that annotation.
+      # This is the single most common reason this chart fails under Argo CD.
+      - ServerSideApply=true
+      - CreateNamespace=true
