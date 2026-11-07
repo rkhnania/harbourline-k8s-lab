@@ -31,3 +31,8 @@ etcd-snapshot.db
 crash.log
 *.tfvars
 !*.tfvars.example
+
+# Sealed Secrets private key - the master key to every sealed secret in this
+# repository. A backstop, not a plan; it belongs in a password manager, not
+# in this folder. See docs/secrets.md.
+*sealed-secrets-key*
