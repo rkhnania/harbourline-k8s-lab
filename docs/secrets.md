@@ -74,29 +74,61 @@ not a plan.
 
 ### Restoring it onto a new cluster
 
-Apply the key **before** the controller starts, or it generates a fresh one and
-adopts that instead:
-
 ```bash
 kubectl --context <new> apply -f ~/sealed-secrets-key-kind-harbourline.yaml
-kubectl --context <new> -n kube-system delete pod -l name=sealed-secrets-controller
+kubectl --context <new> -n kube-system delete pod -l app.kubernetes.io/name=sealed-secrets
 ```
 
-The controller picks up every key it finds on startup and uses the most recent
-to seal, so restoring an old key alongside a new one makes previously sealed
-secrets decryptable again without re-sealing anything.
+Order does not matter. The controller loads **every** key it finds at startup
+and tries each when unsealing, using only the newest to seal new secrets. A
+restored key sits alongside the cluster's own and makes previously sealed
+secrets readable without re-sealing anything.
 
-### Not yet tested
+**The restart is required, not hygiene.** The controller retries a failed
+unseal a few times and then stops:
 
-The restore above is **written, not performed**. Until it has been run on a
-rebuilt cluster, it is a plan rather than a backup — and this project has
-already learned the difference twice: `cluster-state-not-in-git.md` was only
-known to be accurate once something tried to rebuild without it, and the
-smoke test only counted once it had failed on a genuinely broken deployment.
+    level=ERROR msg="Error updating, giving up" key=monitoring/grafana-admin
+      error="no key could decrypt secret (admin-user, admin-password)"
 
-**Test:** `terraform destroy && terraform apply` on
-[`terraform/kind-bootstrap`](../terraform/kind-bootstrap/), restore the key,
-and confirm the sealed secret decrypts on a cluster that has never seen it.
+A key restored after it has given up changes nothing until the controller is
+restarted. The symptom - key present, Secret still missing - looks exactly
+like a failed restore.
+
+### Tested on 2026-11-08
+
+Performed, not described. `terraform destroy && terraform apply` on
+[`terraform/kind-bootstrap`](../terraform/kind-bootstrap/) produced a cluster
+that had never held the key, and Argo CD applied the sealed secret from Git.
+
+**Before the restore** - the failure that makes sealing worth anything:
+
+    NAME            STATUS                                                   SYNCED
+    grafana-admin   no key could decrypt secret (admin-password, admin-user) False
+
+    Error from server (NotFound): secrets "grafana-admin" not found
+
+The SealedSecret existed - it is only YAML, nothing stops it being created -
+but no Secret appeared. Ciphertext and nothing else.
+
+**After applying the backed-up key and restarting the controller:**
+
+    NAME                                     STATUS   SYNCED   AGE
+    sealedsecret.bitnami.com/grafana-admin            True     5m48s
+
+    NAME                   TYPE     DATA   AGE
+    secret/grafana-admin   Opaque   2      26s
+
+Same ciphertext, different cluster, decrypted.
+
+Two things the test established that writing could not:
+
+- **The documented restart label was wrong.** This file said
+  `-l name=sealed-secrets-controller`, which selects nothing. The pod carries
+  `app.kubernetes.io/name=sealed-secrets`. A restore procedure that has never
+  been run contains at least one command that does not work.
+- **`kubectl apply` of the exported key worked unmodified**, despite the
+  `resourceVersion` and `uid` that a `get -o yaml` leaves behind and that
+  usually make an apply fail on an object that does not exist.
 
 ## Known weaknesses
 

@@ -36,3 +36,11 @@ crash.log
 # repository. A backstop, not a plan; it belongs in a password manager, not
 # in this folder. See docs/secrets.md.
 *sealed-secrets-key*
+
+# Kubeconfigs. The kind Terraform provider writes the new cluster's kubeconfig
+# beside the module; it contains client-key-data, a private key with
+# cluster-admin. One was committed on 2026-11-01 by a careless `git add -A` -
+# see docs/security-decisions.md.
+terraform/**/*-config
+*.kubeconfig
+kubeconfig

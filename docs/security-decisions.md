@@ -244,3 +244,36 @@ reasoning from anyone reading the repository, and documenting here alone
 leaves the quality gate failing forever on findings that were deliberately
 accepted.
 
+## Committed kubeconfig — 2026-11-01, found 2026-11-08
+
+A kubeconfig containing `client-key-data` was committed to this public
+repository in `34bb8eb` and again in `7ec45f0`. The `tehcyx/kind` Terraform
+provider writes the new cluster's kubeconfig beside the module as
+`harbourline-tf-config`, and a `git add -A` after `terraform apply` swept it
+in. Nobody looked at what was being staged.
+
+**Assessed impact: none, by luck rather than design.** The credential
+authenticates to `kind-harbourline-tf` at `https://127.0.0.1:44813` — a
+loopback address on one workstation — and that cluster has been destroyed and
+rebuilt twice since, taking its CA with it. The certificate cannot be used
+against anything that still exists, and could never have been reached from
+outside the machine that created it.
+
+**Not rewriting history.** `git filter-repo` on a published repository
+invalidates every clone and every commit hash downstream, and here it would
+remove a credential that is already void. The honest record is worth more than
+a clean one.
+
+**That reasoning does not generalise.** For a credential with a reachable
+endpoint, removing the commit is the *least* important step and on its own
+achieves nothing: anyone who cloned the repository, and GitHub's own cached
+views, still hold it. **Rotate the credential first**, then clean history if
+it is worth the disruption. A deleted commit is not a revoked key.
+
+**Prevention:** `.gitignore` now carries `terraform/**/*-config`,
+`*.kubeconfig` and `kubeconfig`. The underlying habit is the real fix — `git
+add -A` in a directory a tool writes into stages whatever that tool left
+behind. `git status` before `git add` costs two seconds.
+
+**Review date:** 2027-05-08 — confirm no further credential material has been
+committed, with `git log --all --name-only | sort -u | grep -iE 'config$|key|cred|secret'`.
