@@ -132,6 +132,27 @@ cluster.
 
 ## Known debt
 
+- **The provider depends on a resource in the same state.** The `helm`
+  provider is configured from `kind_cluster.this`'s attributes, so any plan
+  that *replaces* the cluster cannot configure it - the attributes are unknown
+  until apply. Adding a node label on 2026-11-08 produced:
+
+      Error: Kubernetes cluster unreachable: invalid configuration:
+      no configuration has been provided
+        with helm_release.argocd
+
+  The first apply worked because nothing existed to refresh. This is the
+  canonical argument for splitting infrastructure and application layers into
+  **separate stacks with separate state**: one owns the cluster, the other
+  owns what runs on it, and neither can make the other unplannable.
+
+  Workaround for a disposable cluster: `terraform destroy && terraform apply`,
+  or `terraform apply -target=kind_cluster.this` first. Neither is a fix.
+
+- **Changing a node label replaces the cluster.** kind cannot relabel a
+  running node, so `labels` is marked `# forces replacement`. Fine here;
+  worth knowing before doing it to something that holds data.
+
 - **Local state.** Fine for a cluster that rebuilds in four minutes. For
   anything shared or stateful this belongs in a remote backend with locking -
   two people running `apply` against local state is a race with no referee.

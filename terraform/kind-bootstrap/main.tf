@@ -17,6 +17,19 @@ resource "kind_cluster" "this" {
     }
     node {
       role = "worker"
+
+      # GAP 2 OF 4 from docs/rebuild-test.md. harbourline-db-0 sat Pending on
+      # the rebuilt cluster because its StatefulSet carries
+      # nodeSelector: tier=database and no node had the label. It had been
+      # applied by hand to the working cluster in September and written down
+      # in cluster-state-not-in-git.md - which is the only reason it took
+      # seconds to diagnose rather than being chased as a storage fault.
+      #
+      # A node label is cluster state like any other. Declaring it here is
+      # what stops the next rebuild hitting the same wall.
+      labels = {
+        tier = "database"
+      }
     }
   }
 }
