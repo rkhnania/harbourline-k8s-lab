@@ -130,6 +130,32 @@ Two things the test established that writing could not:
   `resourceVersion` and `uid` that a `get -o yaml` leaves behind and that
   usually make an apply fail on an object that does not exist.
 
+## Adopting a Secret that already exists
+
+Sealing a secret that a cluster already has by hand fails:
+
+    failed update: Resource "harbourline-db-secret" already exists
+    and is not managed by SealedSecret
+
+**That refusal is a security control, not an inconvenience.** If the controller
+overwrote any Secret it was pointed at, anyone who could commit a SealedSecret
+could replace any Secret in the cluster — including a TLS key or a cloud
+credential — by sealing a value against its name. It only writes Secrets it
+created, or ones explicitly handed to it:
+
+```bash
+kubectl -n <namespace> annotate secret <name> \
+  sealedsecrets.bitnami.com/managed=true --overwrite
+```
+
+Hit on 2026-11-07 with `harbourline-db-secret`, which had existed since
+September. The lab cluster did not hit it — nothing existed there, so the
+controller created the Secret freely. **Adoption is only hard where something
+is already running**, which is the same lesson as the hand-installed Helm
+releases, in a different costume.
+
+Expect the same for `*.hl.internal` on the VM cluster.
+
 ## Known weaknesses
 
 - **Rotation is manual.** Changing a value means re-sealing and committing.

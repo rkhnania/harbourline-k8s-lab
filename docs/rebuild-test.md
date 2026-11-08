@@ -136,3 +136,72 @@ Re-run it any time:
 ```
 terraform destroy && terraform apply
 ```
+
+---
+
+# Second rebuild — 2026-11-08
+
+All four gaps from the first run were closed beforehand. The cluster was
+destroyed and rebuilt from nothing.
+
+## Every workload came up
+
+| 2026-11-01 | 2026-11-08 |
+|---|---|
+| `harbourline-api` `ImagePullBackOff` ×3 | **Running ×3** — GHCR packages made public |
+| `harbourline-db-0` **Pending** | **Running** — `tier=database` declared in Terraform |
+| `harbourline-reports` `CreateContainerConfigError` | **Running ×2** — database password sealed |
+| `harbourline-web` Running | Running |
+
+Nine pods, all Running, on a cluster that did not exist ten minutes earlier.
+
+**One manual step remains and always will:** restoring the Sealed Secrets
+private key. That is not a flaw to fix. **You cannot have zero secrets outside
+Git — you can have exactly one.** Every GitOps system has a bootstrap
+credential; the work is reducing it to a single backed-up, tested thing rather
+than four scattered ones nobody wrote down.
+
+## But the application did not work — a fifth gap
+
+The smoke test failed, and because it now reports what it actually saw, the
+cause arrived with it:
+
+    FAIL  web -> api -> db  (http://harbourline-web/api/shipments)
+          status: 500
+          {"error":"relation \"shipments\" does not exist ..."}
+
+Every pod healthy, every service reachable, and no schema. `db-init` had never
+run — no such pod existed — and the `harbourline` Application sat
+`Progressing / Running` indefinitely.
+
+**The cause: a health check on a resource that can never be healthy.**
+
+`k8s/base` contains an Ingress. Argo CD rates an Ingress healthy only once its
+status carries a load balancer address, and that address is written by an
+ingress controller. The Terraform bootstrap installs Argo CD and nothing else,
+so there is no controller, so the Ingress never goes Healthy, so the sync never
+leaves its Sync phase, so the **PostSync** hook that seeds the database never
+fires.
+
+Everything behind that check is deadlocked, and nothing reports an error —
+`Progressing` is not a failure state, so it never times out into one.
+
+This is a different species from the first four. Those were missing *state*.
+This is a missing *dependency*: the application layer assumes an ingress
+controller that nothing declares and nothing installs.
+
+### Not fixed yet — the options
+
+- **Install an ingress controller in the bootstrap.** Honest, and makes the
+  rebuilt cluster match the real one. Adds a component to the layer that is
+  meant to stay minimal.
+- **Tell Argo CD to ignore Ingress health** on this Application. One line,
+  and it blinds a check that is correct on the cluster that does have a
+  controller.
+- **Move `db-init` out of PostSync.** Removes the ordering guarantee it exists
+  to provide.
+
+The last line of defence worked, and that is the result worth keeping: **the
+smoke test caught a deployment where every Kubernetes health signal was green
+and the application returned 500 to every request.** That is 12 October
+exactly, and this time something said so.
