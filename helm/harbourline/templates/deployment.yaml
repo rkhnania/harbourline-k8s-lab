@@ -32,8 +32,14 @@ spec:
       # effect; the ServiceAccount's protects any future pod that uses it
       # without saying so. Either alone leaves a gap.
       automountServiceAccountToken: false
+      {{- with .Values.imagePullSecret }}
+      # Optional since 2026-11-08. The GHCR packages are public, so nothing
+      # here needs a registry credential - which removed a secret rather than
+      # sealing one. Kept as a value because a private registry is the normal
+      # enterprise case and this is the hook for it.
       imagePullSecrets:
-        - name: {{ .Values.imagePullSecret }}
+        - name: {{ . }}
+      {{- end }}
       {{- if .Values.spread.enabled }}
       topologySpreadConstraints:
         - maxSkew: {{ .Values.spread.maxSkew }}

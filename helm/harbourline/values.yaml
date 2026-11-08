@@ -10,7 +10,13 @@ image:
   repository: harbourline/app
   tag: latest
 
-imagePullSecret: ghcr-pull
+# No registry credential. All three GHCR packages were made public on
+# 2026-11-08, which closed two rebuild-test gaps at once: the hand-made
+# ghcr-pull secret, and harbourline-api's package visibility differing from
+# its siblings - web pulled and ran on the rebuilt cluster while api did not.
+#
+# Set this to a Secret name to use a private registry instead.
+imagePullSecret: ""
 containerPort: 8080
 configMapName: harbourline-config
 probePath: /health

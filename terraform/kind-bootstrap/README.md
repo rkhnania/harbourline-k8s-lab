@@ -72,7 +72,6 @@ Harbourline - and stops at three things that have never been in Git, listed in
 
 | Missing | Effect |
 |---|---|
-| `ghcr-pull` image pull secret | Pods stay `ImagePullBackOff` |
 | `harbourline-db-secret` | Postgres will not start |
 | TLS certificate | Ingress serves nothing |
 
