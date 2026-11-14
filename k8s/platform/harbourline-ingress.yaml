@@ -29,6 +29,35 @@ metadata:
   # Explicit, because this Application's destination namespace is argocd and
   # the other manifests here name their own too.
   namespace: harbourline
+  annotations:
+    # ─── Sticky sessions for the Portal tier ──────────────────────────────
+    #
+    # The Blue Yonder WMS topology puts stickiness on the load balancers
+    # facing users, and marks the middleware tier non-sticky. This is that,
+    # in Kubernetes.
+    #
+    # L7, keyed on a cookie the ingress controller sets and the browser
+    # returns. It identifies a SESSION, which is what "sticky" is supposed to
+    # mean.
+    #
+    # WHY NOT sessionAffinity: ClientIP ON THE SERVICE
+    # Measured on 2026-11-14. With ClientIP on the api Service, ten requests
+    # reached exactly two of three pods - 5 and 5 - and the third got nothing.
+    # A Service sees the source IP of whatever opened the connection, which
+    # behind a proxy is the proxy's pod. It pinned per nginx pod, not per
+    # user, and stranded a third of the api capacity. L4 affinity cannot see
+    # users, and nothing warns you.
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "harbourline-portal"
+    # 8 hours - a warehouse shift. The real constraint on a WMS portal, where
+    # an operator loses their working context if the session moves.
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "28800"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "28800"
+    # balanced, not persistent: on a scale-up the controller may rehash some
+    # sessions onto new pods. `persistent` keeps every existing session where
+    # it is, which sounds better and means a scale-out relieves nothing until
+    # sessions expire - new capacity sits idle while the old pods stay hot.
+    nginx.ingress.kubernetes.io/affinity-mode: "balanced"
 spec:
   ingressClassName: nginx
   rules:
