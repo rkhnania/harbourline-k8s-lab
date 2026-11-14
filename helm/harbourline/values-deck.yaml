@@ -31,12 +31,26 @@ env:
 # Note what this does NOT tell you: that the gateway can reach Plimsoll Core.
 # A Deck pod with a broken route to the api answers this probe perfectly and
 # fails every SCAN. The smoke test is what covers that, from outside.
+#
+# httpGet: null IS LOAD-BEARING. Helm merges values maps DEEPLY, so the
+# httpGet handler in values.yaml survives into this probe unless it is
+# explicitly removed. The rendered probe then carries two handlers and the API
+# server refuses the Deployment:
+#
+#   Deployment.apps "harbourline-deck" is invalid:
+#   spec.template.spec.containers[0].livenessProbe.tcpSocket: Forbidden:
+#   may not specify more than 1 handler type
+#
+# Setting a key to null is how Helm deletes an inherited one - the same
+# mechanism as `envFrom: null` above, and the same trap.
 readinessProbe:
+  httpGet: null
   tcpSocket:
     port: 5555
   initialDelaySeconds: 2
   periodSeconds: 5
 livenessProbe:
+  httpGet: null
   tcpSocket:
     port: 5555
   initialDelaySeconds: 5
