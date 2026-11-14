@@ -40,3 +40,17 @@ startupProbe:
     port: 8080
   periodSeconds: 3
   failureThreshold: 20
+
+# EXPERIMENT, 2026-11-14 - expected to be WRONG, kept only long enough to
+# measure. Modelling the Blue Yonder WMS Portal tier, which the architecture
+# diagram shows behind load balancers doing sticky sessions.
+#
+# ClientIP is the only session affinity a Kubernetes Service offers. The
+# prediction: it will NOT pin a user, because the api Service never sees a
+# user. It sees nginx in the web pod. Two web pods means two source IPs, so
+# three api pods should collapse to two - not one.
+#
+# If that is what happens, L4 affinity is confirmed as the wrong layer and the
+# correct answer is cookie affinity at the ingress.
+service:
+  sessionAffinity: ClientIP

@@ -12,4 +12,25 @@ spec:
   ports:
     - port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.targetPort | default .Values.containerPort }}
+  {{- with .Values.service.sessionAffinity }}
+  # STICKY SESSIONS, L4. Kubernetes offers exactly one mechanism here:
+  # ClientIP. It hashes the SOURCE IP of the connection reaching the Service
+  # and pins it to one endpoint.
+  #
+  # That is the whole feature, and it is the reason it is usually the wrong
+  # tool: "client" means whatever opened the TCP connection. Behind a proxy -
+  # an Ingress controller, nginx, a service mesh sidecar - that is the proxy's
+  # pod IP, not the user's. Every user behind one proxy pod becomes one sticky
+  # client.
+  #
+  # Real stickiness for users lives at L7, keyed on a cookie, at the ingress.
+  # Which is exactly where the Blue Yonder diagram puts it: on the load
+  # balancers, not between the tiers.
+  sessionAffinity: {{ . }}
+  {{- with $.Values.service.sessionAffinityTimeout }}
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: {{ . }}
+  {{- end }}
+  {{- end }}
 {{- end }}
