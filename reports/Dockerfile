@@ -3,7 +3,16 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /build
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# --only-binary=:all: refuses source distributions.
+#
+# Without it, pip may fall back to an sdist and run its setup.py during the
+# build - arbitrary code from a package index, executing inside the image,
+# with network access. Wheels are data; sdists are programs.
+#
+# The cost is real: a dependency with no wheel for this platform fails the
+# build instead of silently compiling. That is the trade, and failing is the
+# better half of it.
+RUN pip install --no-cache-dir --only-binary=:all: --prefix=/install -r requirements.txt
 
 # ---- Stage 2: runtime ----
 FROM python:3.12-slim

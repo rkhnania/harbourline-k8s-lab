@@ -277,3 +277,61 @@ behind. `git status` before `git add` costs two seconds.
 
 **Review date:** 2027-05-08 — confirm no further credential material has been
 committed, with `git log --all --name-only | sort -u | grep -iE 'config$|key|cred|secret'`.
+
+## Two scanners changed their rules on the same day — 2026-11-14
+
+A commit adding a new service failed both security gates. Neither failure was
+caused by the new service.
+
+**Trivy** raised `KSV-0125` on `curlimages/curl:8.11.1` in a lab manifest
+written on 2026-10-31 that had passed every build since. Trivy's bundled
+policy set had updated.
+
+**SonarCloud** failed the quality gate with Security Rating C. Its own banner
+explained it: *"the quality profile assigned to this project has changed"*.
+SonarCloud **deprecated Security Hotspots and converted them into Issues** —
+and Issues count toward the Security Rating while Hotspots never did. The 20
+Medium hotspots that had sat on the backlog since October became 33 issues
+inside the 25-day new-code window, and the gate started failing on code nobody
+had touched.
+
+### The lesson, which is bigger than either finding
+
+**A scanner's rule set is an unpinned dependency.**
+
+This project pins its action SHAs, its chart versions, its container base
+images and its Python packages. The *rules those scanners apply* are pinned
+nowhere, and they are what decides whether a build is green.
+
+So: **a green build is a statement about the rules on the day it ran, not a
+property of the code.** Worth knowing before telling anyone `main` is always
+releasable, and worth saying out loud when a pipeline is sold as a guarantee.
+
+Pinning them is possible — Trivy's policy bundle has versions, Sonar supports
+a custom quality profile rather than the built-in "Sonar way" — and the trade
+is the usual one: pinned rules do not surface new classes of problem until
+someone bumps them. Not pinning is defensible. Not *knowing* is not.
+
+### What was fixed rather than accepted
+
+`pip install --only-binary=:all:` in both Dockerfiles and in CI. Without it pip
+may fall back to a source distribution and execute its `setup.py` during the
+build — arbitrary code from a package index running inside the image, with
+network access. Wheels are data; sdists are programs.
+
+The cost: a dependency with no wheel for the platform now fails the build
+rather than silently compiling. Failing is the better half of that trade.
+
+### Still open
+
+- **`"PASSWORD" detected`** in `ci.yaml` (L47, L77) — `TEST_DB_PASSWORD:
+  postgres`, the credential for a throwaway Postgres service container that
+  exists for the length of one job. A genuine test fixture, and the right
+  resolution is to mark it Accepted in SonarCloud with that reasoning rather
+  than to rename the variable so the heuristic stops matching.
+- **Transitive dependencies are unlocked.** `flask==3.0.3` is pinned; what
+  Flask pulls in is not. The fix is a compiled lock file with hashes
+  (`pip-compile --generate-hashes`), which also makes the build reproducible —
+  the same argument as `.terraform.lock.hcl`, one ecosystem over.
+
+**Review date:** 2027-05-14.
