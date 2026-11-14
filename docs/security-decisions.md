@@ -335,3 +335,32 @@ rather than silently compiling. Failing is the better half of that trade.
   the same argument as `.terraform.lock.hcl`, one ecosystem over.
 
 **Review date:** 2027-05-14.
+
+### SonarCloud downgraded to advisory — 2026-11-14
+
+The quality gate stopped blocking the pipeline. Recorded here because removing
+enforcement is a security decision and should look like one.
+
+**What forced it.** The reclassification above. Twenty Medium hotspots became
+33 issues inside the new-code window and the gate failed on untouched code.
+The blocking findings were triaged and accepted; the gate stayed red on
+remaining items that are real but not urgent — chiefly unlocked transitive
+dependencies.
+
+**The reasoning.** A gate that turns red without a commit is not a gate on
+this repository. It is a gate on SonarSource's release schedule. For an hour
+it blocked every deploy over findings already recorded, already assessed, and
+already carrying a review date.
+
+**What is lost, stated plainly.** A genuine new vulnerability introduced in
+Python code can now reach GHCR. Trivy still blocks on filesystem, config and
+image scans, so the pipeline is weakened rather than open — but it *is*
+weakened, and the README no longer claims every stage can refuse.
+
+**The correct fix, not yet done.** Define a quality gate owned by this project
+rather than inheriting SonarCloud's "Sonar way", and re-enable blocking
+against it. A gate you own does not move when the vendor's does. Inheriting a
+vendor's default was the actual mistake; the reclassification only exposed it.
+
+**Review date:** 2027-02-14 — sooner than the usual twelve months, because
+this one removes a control rather than accepting a finding.

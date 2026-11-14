@@ -82,10 +82,20 @@ flowchart LR
   ecr -.-> eks["EKS<br/>(on demand)"]
 ```
 
-**Every stage can refuse.** A failing test, a failed SonarCloud quality gate, a
-HIGH vulnerability or a Kubernetes misconfiguration each stop the pipeline —
-verified by opening a pull request with a known-vulnerable dependency and
-watching it blocked, rather than by assuming.
+**Most stages can refuse.** A failing test, a HIGH vulnerability or a
+Kubernetes misconfiguration each stop the pipeline — verified by opening a
+pull request with a known-vulnerable dependency and watching it blocked,
+rather than by assuming.
+
+**SonarCloud is advisory, and that is a downgrade.** It blocked until
+2026-11-14, when SonarCloud deprecated Security Hotspots and converted them
+into Issues — which count toward the Security Rating where Hotspots did not.
+A gate that had been green failed on code nobody had touched, and kept failing.
+A gate that can turn red without a commit is a gate on the vendor's release
+schedule, not on this repository. The analysis still runs and the findings are
+still visible; enforcement is gone until the backlog is triaged and a
+*project-owned* quality gate replaces the inherited one. See
+[`docs/security-decisions.md`](docs/security-decisions.md).
 
 **No cluster credentials exist in CI.** The pipeline's last step is a commit that
 bumps an image tag; Argo CD pulls. A compromised runner cannot reach a cluster.
