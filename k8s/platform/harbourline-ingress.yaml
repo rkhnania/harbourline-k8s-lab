@@ -1,0 +1,51 @@
+# Front door for the application.
+#
+# MOVED HERE FROM k8s/base ON 2026-11-14, and the reason is the fifth gap found
+# by the rebuild test on 2026-11-08.
+#
+# An Ingress is only Healthy to Argo CD once its status carries a load balancer
+# address, and that address is written by an ingress controller. On a cluster
+# with no controller it stays Progressing forever - which is correct, and was
+# catastrophic in k8s/base: Argo CD waits for every resource in an Application
+# to be Healthy before running its PostSync hooks, so the Ingress deadlocked
+# the hook that seeds the database. Every pod ran, every signal was green, and
+# the application returned 500 to every request because no table existed.
+#
+# An Ingress depends on a platform component. A StatefulSet does not. Keeping
+# them in one Application means a missing platform component blocks an
+# application-layer hook, with no error anywhere - `Progressing` is not a
+# failure state and never times out into one.
+#
+# Here it sits beside Argo CD's and Grafana's Ingresses, where an unhealthy
+# Ingress means what it should: this cluster has no ingress controller.
+#
+# DEBT: ingressClassName is nginx, and ingress-nginx was retired in March 2026.
+# The VM cluster moved to Traefik; this one has not. With all three Ingresses
+# now in one directory, that migration is a single-directory change.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: harbourline
+  # Explicit, because this Application's destination namespace is argocd and
+  # the other manifests here name their own too.
+  namespace: harbourline
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: harbourline.localtest.me
+      http:
+        paths:
+          - path: /reports
+            pathType: Prefix
+            backend:
+              service:
+                name: harbourline-reports
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: harbourline-web
+                port:
+                  number: 80
