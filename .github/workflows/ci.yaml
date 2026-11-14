@@ -71,7 +71,7 @@ jobs:
         # --only-binary=:all: refuses source distributions, so pip cannot
         # execute a package's setup.py on the runner. Wheels are data; sdists
         # are programs.
-        run: pip install --only-binary=:all: -r requirements.txt -r requirements-dev.txt
+        run: "pip install --only-binary=:all: -r requirements.txt -r requirements-dev.txt"
 
       - name: Run ${{ matrix.component }} tests
         working-directory: ./${{ matrix.component }}
