@@ -1,14 +1,41 @@
-# A WMS topology, translated to Kubernetes
+# Plimsoll — a WMS topology, translated to Kubernetes
 
-Harbourline Logistics is a warehouse operation, and warehouse systems have a
-shape. This document takes a conventional tier-3 WMS architecture — the Blue
-Yonder/MOCA pattern: a Portal tier, a middleware tier, Oracle RAC with Data
-Guard, RF guns reaching it through terminal emulation — and works out what it
-becomes on Kubernetes.
+**Plimsoll** is Harbourline Logistics' warehouse management system. Harbourline
+is the company; Plimsoll is the product.
+
+> The Plimsoll line is the mark on a ship's hull showing the maximum safe
+> loading depth. Samuel Plimsoll spent a decade getting it written into law in
+> 1876, because owners were sending overloaded "coffin ships" to sea and
+> insuring the crew. A system whose entire job is knowing how much can safely
+> be held and moved is named after the mark that says so.
+
+Warehouse systems have a shape. This document takes a conventional tier-3 WMS
+architecture — the Blue Yonder/MOCA pattern: a Portal tier, a middleware tier,
+Oracle RAC with Data Guard, RF guns reaching it through terminal emulation —
+and works out what it becomes on Kubernetes.
 
 **The useful part is not the mapping. It is the mismatches.** Three of these
 tiers translate almost directly. One does not translate at all, and saying so
 plainly is more valuable than a diagram where everything fits.
+
+## The tiers
+
+| Plimsoll tier | What it is | WMS equivalent |
+|---|---|---|
+| **Plimsoll Portal** | `harbourline-web` — the browser front end | Portal tier |
+| **Plimsoll Core** | `harbourline-api` — shipment operations | MOCA middleware |
+| **Plimsoll Insight** | `harbourline-reports` — aggregation | reporting tier |
+| **Plimsoll Deck** | planned — RF gun gateway | StayLinked |
+
+**The Kubernetes objects keep their `harbourline-` names on purpose.** Renaming
+them would mean a new namespace, and every SealedSecret in this repository is
+sealed against `harbourline/<name>` — namespace *and* name — so they would all
+become undecryptable and need re-sealing. The NetworkPolicies, Argo CD
+Applications and container packages follow too.
+
+That is a large blast radius for branding, and it is also what happens in real
+organisations: the product gets named by marketing, the infrastructure keeps
+the name it was born with, and the mapping lives in a document like this one.
 
 | WMS tier | Kubernetes | State |
 |---|---|---|

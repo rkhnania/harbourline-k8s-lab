@@ -1,6 +1,7 @@
 # Harbourline Logistics — Container & Kubernetes Lab
 
-A shipment-tracking application used as the workload for building, breaking and
+**Plimsoll** — a warehouse management system for Harbourline Logistics, used as
+the workload for building, breaking and
 operating **three Kubernetes environments**: a local `kind` cluster for GitOps and
 application work, a **bare-metal multi-node cluster built from scratch with
 kubeadm**, and **Amazon EKS**, stood up and torn down per session.
@@ -18,6 +19,21 @@ post-deployment smoke test. Getting there took
 [three rebuilds](docs/rebuild-test.md) and found five gaps — the last of which
 left every health signal green while the application returned 500 to every
 request.
+
+---
+
+### Why Plimsoll
+
+The Plimsoll line is the mark on a ship's hull showing maximum safe loading.
+Samuel Plimsoll got it written into law in 1876 to stop owners sending
+overloaded ships to sea. A warehouse system is about how much can safely be
+held and moved.
+
+Its architecture is modelled on a conventional tier-3 WMS — Portal, middleware,
+database with a standby — and
+[`docs/wms-architecture.md`](docs/wms-architecture.md) works through what
+translates to Kubernetes and what does not. Oracle RAC does not, and saying so
+is more useful than a diagram where everything fits.
 
 ---
 
