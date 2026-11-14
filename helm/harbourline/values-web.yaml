@@ -4,7 +4,7 @@ replicaCount: 2
 
 image:
   repository: ghcr.io/rkhnania/harbourline-web
-  tag: "7d66df1"
+  tag: "e8f93cc"
 
 podSecurityContext:
   runAsUser: 101
