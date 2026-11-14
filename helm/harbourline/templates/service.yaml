@@ -12,6 +12,17 @@ spec:
   ports:
     - port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.targetPort | default .Values.containerPort }}
+      {{- with .Values.service.nodePort }}
+      # A fixed nodePort, not an allocated one. Handheld scanners are
+      # configured with a host and port by someone walking round a warehouse
+      # with a cradle; a port that changes on redeploy means reconfiguring
+      # every device. The cost is that this number is now cluster state and
+      # must not collide - 30000-32767 is the default range.
+      nodePort: {{ . }}
+      {{- end }}
+      {{- with .Values.service.protocol }}
+      protocol: {{ . }}
+      {{- end }}
   {{- with .Values.service.sessionAffinity }}
   # STICKY SESSIONS, L4. Kubernetes offers exactly one mechanism here:
   # ClientIP. It hashes the SOURCE IP of the connection reaching the Service

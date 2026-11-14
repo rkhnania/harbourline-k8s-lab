@@ -45,6 +45,8 @@ env: []
 
 service:
   port: 8080
+  # nodePort, protocol and sessionAffinity are unset by default. Only Plimsoll
+  # Deck needs the first two, and only because it is not HTTP.
 
 envFrom:
   - configMapRef:

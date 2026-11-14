@@ -1,0 +1,91 @@
+# Plimsoll Deck - the RF gun gateway.
+#
+# The tier that breaks the assumptions every other service here relies on:
+# not HTTP, not request/response, and not safely disposable.
+
+name: harbourline-deck
+containerName: deck
+replicaCount: 2
+
+image:
+  repository: ghcr.io/rkhnania/harbourline-deck
+  tag: "latest" # bumped by CI, like the others
+
+containerPort: 5555
+
+# No ConfigMap. Deck needs one address and none of the database settings the
+# shared ConfigMap carries.
+envFrom: null
+env:
+  - name: API_URL
+    value: "http://harbourline-api:8080"
+  # Half a shift. A scanner left in a cradle should eventually release its
+  # connection; one in use must never be timed out mid-pick.
+  - name: DECK_IDLE_TIMEOUT
+    value: "14400"
+
+# TCP PROBES, NOT HTTP. There is no /health to request - the protocol has no
+# concept of a request. Opening a socket is the only honest check, and it is
+# exactly what a scanner does.
+#
+# Note what this does NOT tell you: that the gateway can reach Plimsoll Core.
+# A Deck pod with a broken route to the api answers this probe perfectly and
+# fails every SCAN. The smoke test is what covers that, from outside.
+readinessProbe:
+  tcpSocket:
+    port: 5555
+  initialDelaySeconds: 2
+  periodSeconds: 5
+livenessProbe:
+  tcpSocket:
+    port: 5555
+  initialDelaySeconds: 5
+  periodSeconds: 15
+
+service:
+  port: 5555
+  protocol: TCP
+  type: NodePort
+  # Fixed, because scanners are configured with a host and port by hand. A
+  # port that moves on redeploy means re-cradling every device in the
+  # warehouse.
+  nodePort: 30555
+
+# THE ROLLING UPDATE PROBLEM, stated rather than solved.
+#
+# Replacing a pod drops every connection it holds. No Kubernetes setting
+# prevents that: a TCP session lives in a process, and the process is going
+# away. These two settings only shape how it happens.
+#
+# maxUnavailable: 0 means the replacement is Ready before the old pod is told
+# to go, so there is somewhere to reconnect TO. Without it a scanner can
+# reconnect into a gap.
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 1
+
+# Two minutes to finish in-flight work after SIGTERM. The application does not
+# yet use it - handling SIGTERM to refuse new connections while draining
+# existing ones is the next piece of work, and until that exists this grace
+# period mostly just delays the kill.
+terminationGracePeriodSeconds: 120
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+# One pod per node where possible. A node failure then costs half the scanners
+# rather than all of them.
+spread:
+  enabled: true
+  maxSkew: 1
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: ScheduleAnyway
+
+pdb:
+  maxUnavailable: 1

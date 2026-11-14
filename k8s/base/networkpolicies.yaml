@@ -271,3 +271,81 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+---
+# 14. Scanners may reach Plimsoll Deck from outside the cluster.
+#
+# NOT FROM AN INGRESS CONTROLLER - there is no Ingress. Traffic arrives at a
+# nodePort and is forwarded by kube-proxy, so as far as this policy is
+# concerned the source is off-cluster and cannot be expressed as a
+# podSelector or a namespaceSelector.
+#
+# ipBlock is the only tool for that, and 0.0.0.0/0 is as narrow as this lab
+# can be. In a real warehouse this is the scanner VLAN - a /24 on the
+# operations network - and writing it that way is most of the value of having
+# the policy at all. Recorded as debt rather than pretended away.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-scanners-to-deck
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-deck
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 0.0.0.0/0 # DEBT: should be the scanner VLAN
+      ports:
+        - protocol: TCP
+          port: 5555
+---
+# 15. Deck may reach Plimsoll Core.
+#
+# Deck holds the operator's session; Core holds the data. The gateway is a
+# protocol translator and nothing more - every question it answers, it asks
+# the api. That is deliberate: a tier that cannot be restarted safely should
+# own as little as possible.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-deck-to-api-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-deck
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: harbourline-api
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# 16. The api may accept Deck.
+#
+# Separate object rather than another peer on allow-web-to-api, so the two
+# callers can be reasoned about and revoked independently. Policy is enforced
+# at both ends; 15 without 16 is a timeout.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-deck-to-api
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: harbourline-deck
+      ports:
+        - protocol: TCP
+          port: 8080

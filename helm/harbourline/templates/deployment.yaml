@@ -24,6 +24,17 @@ spec:
         app: {{ .Values.name }}
         app.kubernetes.io/part-of: {{ .Values.partOf }}
     spec:
+      {{- with .Values.terminationGracePeriodSeconds }}
+      # How long a terminating pod has before SIGKILL. The 30s default is fine
+      # for request/response work - in-flight requests finish in milliseconds.
+      # A tier holding long-lived connections is the case where it matters:
+      # this is the window in which a scanner finishes what it is doing before
+      # the pod goes.
+      #
+      # It does not SAVE the session. Nothing does. It decides whether the
+      # operator completes the pick they are on or loses it mid-scan.
+      terminationGracePeriodSeconds: {{ . }}
+      {{- end }}
       # Named, per-service subject - never `default`, which cannot be scoped to
       # one workload.
       serviceAccountName: {{ .Values.name }}
