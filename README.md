@@ -10,9 +10,14 @@ it — delivery, storage, networking, policy, observability, and what happens wh
 each of those breaks.
 
 A fourth, disposable cluster is built **from nothing by Terraform** in four
-minutes, to test whether any of this is actually reproducible. It is — except
-for [four things](docs/rebuild-test.md), each of them named and measured rather
-than guessed at.
+minutes, to test whether any of this is actually reproducible.
+
+**It is.** A git clone, `terraform apply`, and one key file produce a cluster
+that seeds its own database and proves it works by running its own
+post-deployment smoke test. Getting there took
+[three rebuilds](docs/rebuild-test.md) and found five gaps — the last of which
+left every health signal green while the application returned 500 to every
+request.
 
 ---
 

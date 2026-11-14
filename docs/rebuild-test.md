@@ -205,3 +205,73 @@ The last line of defence worked, and that is the result worth keeping: **the
 smoke test caught a deployment where every Kubernetes health signal was green
 and the application returned 500 to every request.** That is 12 October
 exactly, and this time something said so.
+
+---
+
+# Third rebuild — 2026-11-14 — PASSES
+
+```
+NAME                     STATUS     COMPLETIONS   AGE
+harbourline-db-init      Complete   1/1           49s
+harbourline-smoke-test   Complete   1/1           21s
+
+=== Harbourline post-deployment smoke test ===
+PASS  web serves the page        (http://harbourline-web/)
+PASS  web -> api -> db           (http://harbourline-web/api/shipments)
+PASS  reports aggregates         (http://harbourline-reports:8080/reports/summary)
+
+SMOKE TEST PASSED - all paths serving
+```
+
+A cluster that did not exist fifteen minutes earlier, serving real rows from a
+database it seeded itself, confirmed by its own post-deployment gate. From an
+empty machine: a git clone, `terraform apply`, and one key file.
+
+## What fixed the fifth gap
+
+The Ingress moved from `k8s/base` to `k8s/platform`. Nothing else changed.
+
+`harbourline` reached **Healthy** instead of sitting `Progressing / Running`
+forever, so its PostSync hook fired, so `db-init` created the schema, so the
+smoke test found `SHP-` where it had previously found
+`relation "shipments" does not exist`.
+
+The fix was not a health override, an ignored check, or an extra component in
+the bootstrap. **The resource was in the wrong Application.** An Ingress
+depends on a platform component; a StatefulSet does not. Grouping them meant a
+missing ingress controller silently deadlocked a database hook.
+
+And `platform` now reports **Progressing** on this cluster, which is true and
+useful: there is no ingress controller here. The old arrangement said nothing
+at all while the application returned 500 to every request.
+
+## What is still not guaranteed
+
+**Cross-Application ordering.** `db-init` is a PostSync hook on `harbourline`;
+the smoke test is a PostSync hook on `harbourline-web`. Argo CD syncs
+Applications independently. This run happened to seed the database 28 seconds
+before the smoke test ran. **That was luck, not design** - and on a slower
+rebuild the test could still run against an empty schema and fail correctly for
+the wrong reason.
+
+The real fix remains one Application with sync waves. Until then the smoke
+test's 75-second retry budget is the only thing covering the gap.
+
+## Expected non-failures
+
+| Application | State | Why |
+|---|---|---|
+| `platform` | Progressing | no ingress controller - correct |
+| `kyverno` | OutOfSync / Missing | automated sync deliberately off; an admission webhook gets a human |
+| `policies` | OutOfSync / Missing | its CRDs arrive with Kyverno |
+
+## The one manual step
+
+Restoring the Sealed Secrets private key. It does not go away, and it should
+not:
+
+> **You cannot have zero secrets outside Git. You can have exactly one.**
+
+Every GitOps system has a bootstrap credential. The work was reducing four
+scattered, undocumented ones to a single backed-up key whose restore has been
+tested on a cluster that had never held it.
