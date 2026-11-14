@@ -135,7 +135,7 @@ def dispatch(session, raw):
     return f"ERR  unknown command '{cmd}'", False
 
 
-async def handle(reader, writer):
+async def handle(reader, writer):  # pragma: no cover - socket plumbing
     peer = writer.get_extra_info("peername")
     session = Session(peer)
     writer.write(BANNER.format(host=HOST).encode())
@@ -163,7 +163,7 @@ async def handle(reader, writer):
         writer.close()
 
 
-async def main():
+async def main():  # pragma: no cover - socket plumbing
     server = await asyncio.start_server(handle, BIND, PORT)
     print(f"Plimsoll Deck listening on {BIND}:{PORT} as {HOST}", flush=True)
     async with server:
