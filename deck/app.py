@@ -28,6 +28,11 @@ import urllib.error
 import urllib.request
 
 PORT = int(os.environ.get("DECK_PORT", "5555"))
+# 0.0.0.0 inside a container means "this pod's network namespace", not "the
+# whole network" - the pod has one interface and kube-proxy decides what
+# reaches it. Binding to 127.0.0.1 here would make the pod unreachable from
+# its own Service. Overridable so the intent is declared rather than assumed.
+BIND = os.environ.get("DECK_BIND", "0.0.0.0")  # NOSONAR - see above
 API = os.environ.get("API_URL", "http://harbourline-api:8080")
 HOST = socket.gethostname()
 IDLE_TIMEOUT = int(os.environ.get("DECK_IDLE_TIMEOUT", "1800"))
@@ -42,13 +47,26 @@ BANNER = (
 
 
 def fetch(path):
-    """Call Plimsoll Core. stdlib only - this image has no dependencies."""
+    """Call Plimsoll Core. stdlib only - this image has no dependencies.
+
+    Every failure becomes a message the scanner can display. An operator
+    holding a handheld cannot read a stack trace and cannot retry a crashed
+    gateway, so nothing here is allowed to raise.
+
+    The exceptions are named rather than caught wholesale: `except Exception`
+    hides bugs exactly as well as it handles failures, and a typo in this
+    module would arrive at the scanner as "core unreachable".
+    """
     try:
         with urllib.request.urlopen(f"{API}{path}", timeout=3) as r:
             return json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
         return {"error": f"core returned {e.code}"}
-    except Exception as e:  # noqa: BLE001 - the scanner wants a message, not a trace
+    except urllib.error.URLError as e:
+        return {"error": f"core unreachable: {e.reason}"}
+    except json.JSONDecodeError:
+        return {"error": "core returned malformed JSON"}
+    except (TimeoutError, OSError) as e:
         return {"error": f"core unreachable: {type(e).__name__}"}
 
 
@@ -76,6 +94,47 @@ class Session:
         return f"ERR  {ref} not found"
 
 
+def dispatch(session, raw):
+    """The protocol: text in, text out. Returns (reply, close).
+
+    Deliberately separate from the socket. asyncio.start_server is not ours to
+    test; the command grammar is, and it is the part that will be wrong. A
+    function with no I/O in it can be tested in microseconds without a network,
+    which is the difference between a tier that has tests and one that does
+    not.
+    """
+    parts = raw.strip().split()
+    if not parts:
+        return "", False
+
+    cmd, args = parts[0].upper(), parts[1:]
+
+    if cmd == "QUIT":
+        return f"BYE  {len(session.scans)} picks this session", True
+    if cmd == "SCAN":
+        if not args:
+            return "ERR  SCAN needs a reference", False
+        return session.scan(args[0]), False
+    if cmd == "LIST":
+        data = fetch("/shipments")
+        if "error" in data:
+            return f"ERR  {data['error']}", False
+        rows = data if isinstance(data, list) else data.get("shipments", [])
+        if not rows:
+            return "  (no shipments)", False
+        return "\r\n".join(
+            f"  {r.get('id')}  {r.get('status', '?')}" for r in rows[:20]
+        ), False
+    if cmd == "STATUS":
+        # Prints the gateway hostname so you can SEE which pod holds the
+        # session - the whole point of the exercise.
+        return f"gateway={HOST}  picks={len(session.scans)}", False
+    if cmd == "HELP":
+        return "SCAN <id> | LIST | STATUS | HELP | QUIT", False
+
+    return f"ERR  unknown command '{cmd}'", False
+
+
 async def handle(reader, writer):
     peer = writer.get_extra_info("peername")
     session = Session(peer)
@@ -92,37 +151,12 @@ async def handle(reader, writer):
             if not raw:
                 break
 
-            parts = raw.decode(errors="replace").strip().split()
-            if not parts:
-                continue
-            cmd, args = parts[0].upper(), parts[1:]
-
-            if cmd == "QUIT":
-                writer.write(f"BYE  {len(session.scans)} picks this session\r\n".encode())
+            reply, close = dispatch(session, raw.decode(errors="replace"))
+            if reply:
+                writer.write((reply + "\r\n").encode())
+                await writer.drain()
+            if close:
                 break
-            elif cmd == "SCAN" and args:
-                writer.write((session.scan(args[0]) + "\r\n").encode())
-            elif cmd == "LIST":
-                data = fetch("/shipments")
-                if "error" in data:
-                    writer.write(f"ERR  {data['error']}\r\n".encode())
-                else:
-                    rows = data if isinstance(data, list) else data.get("shipments", [])
-                    for row in rows[:20]:
-                        writer.write(
-                            f"  {row.get('id')}  {row.get('status', '?')}\r\n".encode()
-                        )
-            elif cmd == "STATUS":
-                # Prints the gateway hostname so you can SEE which pod holds
-                # the session - the whole point of the exercise.
-                writer.write(
-                    f"gateway={HOST}  picks={len(session.scans)}\r\n".encode()
-                )
-            elif cmd == "HELP":
-                writer.write(b"SCAN <id> | LIST | STATUS | HELP | QUIT\r\n")
-            else:
-                writer.write(f"ERR  unknown command '{cmd}'\r\n".encode())
-            await writer.drain()
     except (ConnectionResetError, BrokenPipeError):
         pass
     finally:
@@ -130,8 +164,8 @@ async def handle(reader, writer):
 
 
 async def main():
-    server = await asyncio.start_server(handle, "0.0.0.0", PORT)
-    print(f"Plimsoll Deck listening on {PORT} as {HOST}", flush=True)
+    server = await asyncio.start_server(handle, BIND, PORT)
+    print(f"Plimsoll Deck listening on {BIND}:{PORT} as {HOST}", flush=True)
     async with server:
         await server.serve_forever()
 

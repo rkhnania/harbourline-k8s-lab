@@ -1,0 +1,4 @@
+# Test-only. NOT installed into the runtime image - deck/Dockerfile copies
+# app.py and nothing else, so pytest never ships to production.
+pytest==8.3.4
+pytest-cov==6.0.0

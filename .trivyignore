@@ -21,3 +21,29 @@ KSV-0014
 # are created imperatively and never committed (docs/cluster-state-not-in-git.md).
 KSV-01010
 
+# KSV-0125 "uses an image from an untrusted registry".
+# Added 2026-11-14, review 2027-05-14.
+#
+# Fires on curlimages/curl:8.11.1 in k8s/labs/rbac/01-reporter-no-role.yaml.
+#
+# WHAT CHANGED: nothing in this repository. That file was written on
+# 2026-10-31 and passed every build since. Trivy's bundled policy set updated
+# and began enforcing a check that was not previously applied. SonarCloud said
+# the same thing in the same run - "the quality profile assigned to this
+# project has changed".
+#
+# A SCANNER'S RULE SET IS A DEPENDENCY, and this one is not pinned. A green
+# build is a statement about the rules on the day it ran, not a property of
+# the code. Worth knowing before promising anyone that main is always
+# releasable.
+#
+# WHY ACCEPTED: the image is the curl project's own, pinned to an exact tag,
+# and the manifest is a teaching lab applied by hand - no Application
+# references it and it reaches no cluster through the pipeline.
+#
+# THE REAL FIX, not done: mirror third-party images into GHCR and reference
+# them by digest. That removes the finding honestly rather than silencing it,
+# and removes the dependency on Docker Hub being up and unchanged at deploy
+# time. The same image is used by the smoke-test Job inside helm/, which the
+# config scan does not see at all - skip-dirs: helm is its own open debt.
+KSV-0125

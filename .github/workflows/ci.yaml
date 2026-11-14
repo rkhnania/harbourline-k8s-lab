@@ -35,7 +35,7 @@ jobs:
       fail-fast: false
       matrix:
         # web is nginx serving static files - nothing to unit test.
-        component: [api, reports]
+        component: [api, reports, deck]
 
     # A real Postgres, not a mock. GitHub starts this container alongside the
     # job and maps its port onto the runner's localhost. Same shape as running

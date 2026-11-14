@@ -1,0 +1,4 @@
+# Plimsoll Deck has no runtime dependencies - asyncio, urllib and json are all
+# standard library. The file exists because CI installs
+# `requirements.txt -r requirements-dev.txt` for every component, and because
+# an absent file is indistinguishable from a forgotten one.
