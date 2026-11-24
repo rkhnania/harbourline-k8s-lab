@@ -12,3 +12,4 @@ namespace: monitoring
 resources:
   - grafana-admin-sealedsecret.yaml
   - vm-cluster-datasource.yaml
+  - harbourline-alerts.yaml

@@ -1,0 +1,146 @@
+# Plimsoll EMS — the alerting rules.
+#
+# The EMS box in a WMS architecture diagram is not decoration. It is the thing
+# that wakes someone when the overnight wave does not run.
+#
+# Alertmanager has been deployed here since 2026-09-27 and has routed nothing.
+# A monitoring stack with no rules is a dashboard, and a dashboard only works
+# when somebody is looking at it. On 12 October this application was broken for
+# hours: pods Running, probes passing, Argo CD Healthy, Grafana clean, and
+# every request returning a page that said "Loading..." forever.
+#
+# THE DESIGN RULE THESE FOLLOW
+# Alert on symptoms a user would notice, not on causes. "Three pods instead of
+# four" wakes someone for something Kubernetes is already fixing. "No pods are
+# serving" is worth waking for. Every rule below is something an operator in
+# the warehouse would feel.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: harbourline-alerts
+  namespace: monitoring
+  labels:
+    # kube-prometheus-stack's Prometheus selects PrometheusRules by this label.
+    # Without it the rule is valid, accepted by the API server, and silently
+    # never loaded - which is the failure mode this whole file exists to argue
+    # against.
+    release: kps
+spec:
+  groups:
+    - name: plimsoll.availability
+      rules:
+        - alert: PlimsollTierDown
+          # Not "fewer replicas than desired" - that fires during every rolling
+          # update. Zero available means nothing is serving that tier.
+          expr: kube_deployment_status_replicas_available{namespace="harbourline"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            tier: plimsoll
+          annotations:
+            summary: "{{ $labels.deployment }} has no running pods"
+            description: >-
+              Zero available replicas for 2 minutes. Warehouse operators on
+              this tier cannot work.
+            runbook: >-
+              kubectl --context kind-harbourline -n harbourline describe
+              deploy/{{ $labels.deployment }} — then check events and the
+              image tag. ImagePullBackOff after a deploy usually means a tag
+              the pipeline never pushed.
+
+        - alert: PlimsollDatabaseDown
+          expr: kube_statefulset_status_replicas_ready{namespace="harbourline", statefulset="harbourline-db"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            tier: plimsoll
+          annotations:
+            summary: "Plimsoll database is not ready"
+            description: >-
+              Every tier depends on it. Nothing works while this is true.
+
+    - name: plimsoll.correctness
+      rules:
+        # THE RULE THAT WOULD HAVE CAUGHT 12 OCTOBER.
+        #
+        # The smoke test runs after every deploy and makes the request a
+        # browser makes - nginx to the api to Postgres, one hop at a time. When
+        # it fails, the deployment is not serving, whatever the pods say.
+        #
+        # Everything else in this file watches Kubernetes. This watches the
+        # application.
+        - alert: PlimsollSmokeTestFailed
+          expr: kube_job_failed{namespace="harbourline", job_name=~"harbourline-smoke-test.*"} > 0
+          for: 1m
+          labels:
+            severity: critical
+            tier: plimsoll
+          annotations:
+            summary: "Post-deployment smoke test failed"
+            description: >-
+              The application did not serve a real shipment after the last
+              deploy. Pods may be Running and probes may be passing - those
+              check that a process is alive, not that the system works.
+            runbook: >-
+              kubectl --context kind-harbourline -n harbourline logs
+              job/harbourline-smoke-test — it reports which of the three paths
+              failed and curl's exit code: 6 is DNS, 7 refused, 28 dropped.
+
+        - alert: PlimsollDatabaseSeedFailed
+          expr: kube_job_failed{namespace="harbourline", job_name=~"harbourline-db-init.*"} > 0
+          for: 1m
+          labels:
+            severity: critical
+            tier: plimsoll
+          annotations:
+            summary: "Database seed job failed"
+            description: >-
+              The schema may not exist. Queries will return
+              'relation "shipments" does not exist' while every pod looks
+              healthy.
+
+    - name: plimsoll.saturation
+      rules:
+        - alert: PlimsollPodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{namespace="harbourline"}[15m]) * 900 > 3
+          for: 10m
+          labels:
+            severity: warning
+            tier: plimsoll
+          annotations:
+            summary: "{{ $labels.pod }} restarting repeatedly"
+            description: >-
+              More than three restarts in fifteen minutes. A liveness probe is
+              killing it, or it is exiting on startup.
+
+        - alert: PlimsollVolumeFillingUp
+          # Six hours of warning on a database volume is the difference between
+          # a planned resize and an outage. Longhorn and local-path both stop
+          # writes when full; Postgres does not recover gracefully.
+          expr: >-
+            predict_linear(kubelet_volume_stats_available_bytes{namespace="harbourline"}[6h], 6*3600) < 0
+          for: 1h
+          labels:
+            severity: warning
+            tier: plimsoll
+          annotations:
+            summary: "{{ $labels.persistentvolumeclaim }} will be full within 6 hours"
+            description: >-
+              Based on the last six hours of writes. Resize or reclaim now.
+
+    - name: plimsoll.observability
+      rules:
+        # The alert about the alerting. A scrape target that silently stops
+        # being scraped takes every rule that depends on it down with it, and
+        # nothing goes red - the graphs simply stop.
+        - alert: PlimsollTargetMissing
+          expr: up{namespace="harbourline"} == 0
+          for: 10m
+          labels:
+            severity: warning
+            tier: plimsoll
+          annotations:
+            summary: "Prometheus cannot scrape {{ $labels.job }}"
+            description: >-
+              Metrics for this target are stale. Any alert depending on them is
+              now blind rather than quiet.
