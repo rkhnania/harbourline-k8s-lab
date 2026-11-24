@@ -13,3 +13,24 @@ resources:
   - grafana-admin-sealedsecret.yaml
   - vm-cluster-datasource.yaml
   - harbourline-alerts.yaml
+  # Proxmox VE integration. Three objects, one per concern:
+  #   pve-exporter-sealedsecret.yaml - the API token, encrypted, safe in Git
+  #   pve-exporter.yaml              - Deployment + Service + ServiceMonitor
+  #   pve-dashboard.yaml             - the Grafana dashboard, as code
+  # Order here is irrelevant (kustomize sorts by kind), but the DEPENDENCY is
+  # not: the Deployment mounts the Secret with envFrom, so without the sealed
+  # secret the pod sits in CreateContainerConfigError, not CrashLoopBackOff.
+  # Those two statuses point at different problems - config vs code.
+  #
+  # STAGED, NOT YET ACTIVE - 2026-11-24.
+  # These three are written and validated but deliberately commented out,
+  # because pve-exporter-sealedsecret.yaml does not exist yet: it needs the PVE
+  # API token, which needs Proxmox installed (it now is, at 192.168.0.50).
+  # Uncommenting before the sealed secret exists breaks the kustomize build and
+  # fails the whole monitoring-config Application - not just this one object.
+  # A half-finished feature in Git must still BUILD; that is the cost of having
+  # one Application own a directory.
+  # To activate: create the token, kubeseal it, uncomment all three, push.
+  # - pve-exporter-sealedsecret.yaml
+  # - pve-exporter.yaml
+  # - pve-dashboard.yaml
