@@ -270,11 +270,16 @@ jobs:
 
       - name: Update image tags in the Helm values
         run: |
-          for svc in api web reports; do
+          # deck joined the build matrix on 2026-11-14 and this loop did not,
+          # so CI published ghcr.io/.../harbourline-deck:<sha> while
+          # values-deck.yaml still asked for :latest - a tag this pipeline has
+          # never pushed and GHCR does not have. ImagePullBackOff forever,
+          # under a completely green pipeline.
+          for svc in api web reports deck; do
             sed -i "s|^  tag: .*|  tag: \"${TAG}\"|" helm/harbourline/values-$svc.yaml
           done
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add helm/harbourline/values-api.yaml helm/harbourline/values-web.yaml helm/harbourline/values-reports.yaml
-          git commit -m "ci: deploy harbourline api+web+reports:${TAG}" || echo "no manifest change"
+          git add helm/harbourline/values-api.yaml helm/harbourline/values-web.yaml helm/harbourline/values-reports.yaml helm/harbourline/values-deck.yaml
+          git commit -m "ci: deploy harbourline api+web+reports+deck:${TAG}" || echo "no manifest change"
           git push
