@@ -24,8 +24,26 @@ command -v kubeseal >/dev/null || { echo "ERROR: kubeseal not on PATH."; exit 1;
 kubectl --context "$CTX" get ns monitoring >/dev/null \
   || { echo "ERROR: cannot reach the monitoring namespace on context $CTX."; exit 1; }
 
-read -rsp "PVE token value for monitoring@pve!prometheus: " PVE_TOKEN; echo
-[ -n "$PVE_TOKEN" ] || { echo "ERROR: empty token."; exit 1; }
+# PVE_TOKEN may be supplied in the environment when a hidden prompt is awkward
+# (some terminals swallow a paste into `read -rs`). That is a deliberate
+# trade-off: an environment variable set on the command line DOES land in shell
+# history, so prefer the prompt, and rotate the token afterwards if you use this.
+if [ -z "${PVE_TOKEN:-}" ]; then
+  read -rsp "PVE token value for monitoring@pve!prometheus: " PVE_TOKEN; echo
+fi
+[ -n "${PVE_TOKEN:-}" ] || { echo "ERROR: empty token."; exit 1; }
+
+# Strip whitespace a paste may have carried in. A trailing newline or space is
+# invisible, survives base64, and comes back as a flat 401 from Proxmox with no
+# hint that the value is merely dirty rather than wrong.
+PVE_TOKEN="$(printf '%s' "$PVE_TOKEN" | tr -d '[:space:]')"
+
+# PVE tokens are UUIDs. Catch a truncated paste here rather than three layers
+# downstream in an exporter traceback.
+if ! printf '%s' "$PVE_TOKEN" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+  echo "ERROR: that does not look like a PVE token UUID (got ${#PVE_TOKEN} chars)."
+  exit 1
+fi
 
 kubectl create secret generic pve-exporter-credentials -n monitoring \
   --from-literal=PVE_USER='monitoring@pve' \
