@@ -63,6 +63,18 @@ spec:
             capabilities:
               drop:
                 - ALL
+          # WHY /tmp NEEDS A VOLUME.
+          # gunicorn's WorkerTmp calls tempfile.mkstemp() before it will spawn a
+          # single worker. With readOnlyRootFilesystem: true there is nowhere to
+          # write, and the process dies at startup with
+          #   FileNotFoundError: No usable temporary directory found
+          # It binds the port first, so the logs look like a healthy start.
+          # The fix is NOT to relax the hardening. It is to give the one
+          # directory that must be writable a volume of its own. medium: Memory
+          # makes it a tmpfs, so nothing ever lands on a node disk.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 20m
@@ -80,6 +92,11 @@ spec:
             tcpSocket:
               port: http
             initialDelaySeconds: 15
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
 ---
 apiVersion: v1
 kind: Service
