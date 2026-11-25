@@ -31,6 +31,6 @@ resources:
   # A half-finished feature in Git must still BUILD; that is the cost of having
   # one Application own a directory.
   # To activate: create the token, kubeseal it, uncomment all three, push.
-  # - pve-exporter-sealedsecret.yaml
-  # - pve-exporter.yaml
-  # - pve-dashboard.yaml
+  - pve-exporter-sealedsecret.yaml
+  - pve-exporter.yaml
+  - pve-dashboard.yaml
