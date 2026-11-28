@@ -45,12 +45,37 @@ def test_malformed_json_is_a_message_not_a_crash(monkeypatch):
     assert "malformed" in app.fetch("/shipments")["error"]
 
 
-def test_session_scan_tolerates_a_list_response(monkeypatch):
-    """The api returns a bare list; older builds returned {"shipments": [...]}.
+def test_session_scan_reads_the_sku_catalogue(monkeypatch):
+    """Scanning resolves against /skus, not against shipments.
 
-    Deck accepts both rather than breaking on a response shape it did not
-    choose.
+    Until 28 Nov a scan looked a reference up in /shipments, because that was
+    the only table Plimsoll had. A scanner reads a product barcode, so it
+    resolves a SKU - and selecting one moves nothing, which is why this test
+    asserts only on the reply.
     """
-    _urlopen(monkeypatch, json.dumps([{"id": "SHP-7", "status": "PICKED"}]).encode())
+    _urlopen(monkeypatch, json.dumps(
+        [{"sku": "HL-PAL-0001", "description": "Pallet wrap", "uom": "ROLL"}]
+    ).encode())
     session = app.Session(peer=("10.0.0.1", 1))
-    assert session.scan("SHP-7").startswith("OK")
+    reply = session.scan("HL-PAL-0001")
+    assert reply.startswith("OK")
+    assert session.current_sku == "HL-PAL-0001"
+
+
+def test_a_core_refusal_body_is_returned_rather_than_the_status_code(monkeypatch):
+    """post() reads the body of a 409 instead of discarding it.
+
+    Core explains WHY it refused - insufficient stock, over-receipt, order not
+    picked. Throwing that away and reporting "core returned 409" turns an
+    actionable message into a dead end for whoever is holding the scanner.
+    """
+    import urllib.error
+    import io
+
+    def raising(*a, **k):
+        raise urllib.error.HTTPError(
+            "http://core/putaway", 409, "Conflict", {},
+            io.BytesIO(json.dumps({"error": "insufficient stock at source"}).encode()))
+
+    monkeypatch.setattr(app.urllib.request, "urlopen", raising)
+    assert app.post("/putaway", {})["error"] == "insufficient stock at source"

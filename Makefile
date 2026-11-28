@@ -18,7 +18,7 @@ CURL = curlimages/curl:8.11.1
 K = kubectl --context $(CTX)
 
 .PHONY: help status apps sync pve-seal pve-verify pve-logs pve-targets \
-        pve-restart deck-why render schema test-api
+        pve-restart deck-why render schema test-api test-deck
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -95,3 +95,7 @@ test-api: ## Run the api suite on CI's Python against a throwaway Postgres
 schema: ## Objects and row counts the init Job will produce
 	@$(K) -n harbourline exec sts/harbourline-db -- psql -U postgres -c "\\dt" 2>/dev/null \
 	  || echo "database not reachable - is the harbourline Application synced?"
+
+test-deck: ## Run the deck suite on CI's Python (no database needed)
+	@docker run --rm -v "$$PWD":/w -w /w/deck python:3.12-slim sh -c \
+	   "pip install -q -r requirements-dev.txt && python -m pytest -q"
