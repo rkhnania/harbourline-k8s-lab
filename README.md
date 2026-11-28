@@ -1,14 +1,18 @@
 # Harbourline Logistics — Container & Kubernetes Lab
 
+[![CI](https://github.com/rkhnania/harbourline-k8s-lab/actions/workflows/ci.yaml/badge.svg)](https://github.com/rkhnania/harbourline-k8s-lab/actions/workflows/ci.yaml)
+
 **Plimsoll** — a warehouse management system for Harbourline Logistics, used as
 the workload for building, breaking and
 operating **three Kubernetes environments**: a local `kind` cluster for GitOps and
 application work, a **bare-metal multi-node cluster built from scratch with
 kubeadm**, and **Amazon EKS**, stood up and torn down per session.
 
-The application is deliberately small. The interesting part is everything around
-it — delivery, storage, networking, policy, observability, and what happens when
-each of those breaks.
+Plimsoll is a working WMS, not a placeholder: nine tables, invariants enforced
+by the database, an append-only ledger and a report that audits the stock
+against it. Just as much of the work is everything around it — delivery,
+storage, networking, policy, observability, and what happens when each of those
+breaks.
 
 A fourth, disposable cluster is built **from nothing by Terraform** in four
 minutes, to test whether any of this is actually reproducible.
@@ -19,6 +23,56 @@ post-deployment smoke test. Getting there took
 [three rebuilds](docs/rebuild-test.md) and found five gaps — the last of which
 left every health signal green while the application returned 500 to every
 request.
+
+---
+
+## Quick links
+
+**Plimsoll** — on the kind cluster, from the workstation
+
+| | |
+|---|---|
+| Portal | **[harbourline.localtest.me](http://harbourline.localtest.me)** |
+| Portal views | [Overview](http://harbourline.localtest.me/#overview) · [Stock](http://harbourline.localtest.me/#stock) · [Inbound](http://harbourline.localtest.me/#inbound) · [Outbound](http://harbourline.localtest.me/#outbound) · [Ledger](http://harbourline.localtest.me/#ledger) · [Audit](http://harbourline.localtest.me/#audit) |
+| Core API (`/api/`) | [`stock`](http://harbourline.localtest.me/api/stock) · [`orders`](http://harbourline.localtest.me/api/orders) · [`receipts`](http://harbourline.localtest.me/api/receipts) · [`movements`](http://harbourline.localtest.me/api/movements) · [`locations`](http://harbourline.localtest.me/api/locations) · [`skus`](http://harbourline.localtest.me/api/skus) · [`health`](http://harbourline.localtest.me/api/health) |
+| Insight (`/reports/`) | [`reconciliation`](http://harbourline.localtest.me/reports/reconciliation) · [`stock`](http://harbourline.localtest.me/reports/stock) · [`throughput`](http://harbourline.localtest.me/reports/throughput) · [`open-orders`](http://harbourline.localtest.me/reports/open-orders) · [`summary`](http://harbourline.localtest.me/reports/summary) |
+
+**Platform**
+
+| Service | URL | Cluster | Sign-in |
+|---|---|---|---|
+| Argo CD — applications | [argocd.localtest.me](http://argocd.localtest.me) | kind | `admin` — [how to get the password](docs/kind-cluster-access.md) |
+| Grafana — both clusters + Proxmox | [grafana.localtest.me](http://grafana.localtest.me) | kind | `admin` — [how to get the password](k8s/monitoring/README.md) |
+| Argo CD — VM platform | [argocd.hl.internal](https://argocd.hl.internal) | VM | `admin` — [vm-cluster-access.md](docs/vm-cluster-access.md#argo-cd-password) |
+| Longhorn | [longhorn.hl.internal](https://longhorn.hl.internal) | VM | `admin` — [set or reset](docs/vm-cluster-access.md#longhorn-ui-password) |
+| Prometheus | [prometheus.hl.internal](https://prometheus.hl.internal) | VM | none — see Known gaps |
+| Argo CD — Terraform lab | `http://localhost:8080` (port-forward) | `kind-harbourline-tf` | [kind-cluster-access.md](docs/kind-cluster-access.md) |
+| Proxmox VE | [192.168.0.50:8006](https://192.168.0.50:8006) | hypervisor | `root`, realm Linux PAM |
+
+No credentials are stored in this repository; each link above says where the
+password comes from.
+
+`*.hl.internal` resolves through the workstation's hosts file **and** the kind
+cluster's CoreDNS — browsers and pods are different clients and resolve
+differently. See [`docs/vm-cluster-access.md`](docs/vm-cluster-access.md).
+The Terraform lab cluster has no Ingress, so it needs a port-forward and is
+reachable from WSL only.
+
+**Project**
+
+| | |
+|---|---|
+| CI runs | [GitHub Actions](https://github.com/rkhnania/harbourline-k8s-lab/actions/workflows/ci.yaml) |
+| Container images | [GHCR packages](https://github.com/rkhnania?tab=packages&repo_name=harbourline-k8s-lab) |
+| Code quality | [SonarCloud](https://sonarcloud.io/project/overview?id=rkhnania_harbourline-k8s-lab) |
+| History | [Commits on `main`](https://github.com/rkhnania/harbourline-k8s-lab/commits/main) |
+| Operator commands | `make help` — [`Makefile`](Makefile) |
+
+**Start here:** [WMS architecture](docs/wms-architecture.md) ·
+[runtime architecture](docs/architecture.md) ·
+[rebuild from nothing](docs/rebuild-test.md) ·
+[security decisions](docs/security-decisions.md) ·
+[triage a broken cluster](docs/triage.md)
 
 ---
 
@@ -34,6 +88,44 @@ database with a standby — and
 [`docs/wms-architecture.md`](docs/wms-architecture.md) works through what
 translates to Kubernetes and what does not. Oracle RAC does not, and saying so
 is more useful than a diagram where everything fits.
+
+---
+
+## Plimsoll Portal
+
+![Plimsoll Portal — Overview](docs/images/portal-overview.png)
+
+The operator's console for the whole warehouse loop — **receive → putaway →
+pick → dispatch** — with a button for every verb. One static HTML file served by
+nginx, **no framework, no build step, no external requests**: no CDN, no web
+fonts, icons drawn inline. Nothing for Trivy to scan and nothing to break when a
+third party moves.
+
+- **Overview** leads with a work queue: discrepancies first, then orders ready
+  to dispatch, picks, receipts due and pick faces running low.
+- **Every movement is attributed.** An operator name is required before stock
+  moves, and is written to the ledger as `portal/<name>` in the same transaction
+  as the stock change.
+- **Refusals are shown verbatim.** The database enforces the invariants; when it
+  declines (409), the Portal shows the constraint and the numbers rather than a
+  generic error.
+- **The integrity pill** in the top bar is the reconciliation verdict, live — an
+  inconsistent warehouse is visible before any dashboard alerts.
+- Works from 375px phones to wide desktops, light and dark, keyboard included
+  (`/` search, `R` refresh). Each view has its own URL.
+
+| Stock — search, zone filters, dangerous-goods badges | Audit — when the ledger and the balance disagree |
+|---|---|
+| ![Stock](docs/images/portal-stock.png) | ![Audit out of balance](docs/images/portal-audit-out-of-balance.png) |
+
+![Dark mode and tablet](docs/images/portal-dark-and-tablet.png)
+![Phone](docs/images/portal-phone.png)
+
+**Tested in a browser on every push**: 69 checks in headless Chromium against a
+stand-in for Core and Insight that mirrors their refusal bodies and date format
+— navigation, every warehouse verb, validation, the audit turning
+OUT-OF-BALANCE, dark mode, and no horizontal scrolling on any view at tablet or
+phone width. `make test-web` runs the same suite locally.
 
 ---
 
@@ -119,9 +211,10 @@ bumps an image tag; Argo CD pulls. A compromised runner cannot reach a cluster.
 the owner can re-point; a SHA is the content.
 
 **The deployment is validated inside the cluster**, not by CI — which holds no
-credentials and cannot look. A `PostSync` hook requests `/api/shipments` through
-the real front door, so nginx, the API and Postgres are all exercised by one
-request. If it fails the Application goes red. It was built because on 12
+credentials and cannot look. A `PostSync` hook runs five checks through the
+real front door — the page, web → api → Postgres, stock, the reports tier, and
+**the ledger reconciling to the stock balance**, so a deployment that leaves the
+warehouse inconsistent fails too. If any check fails the Application goes red. It was built because on 12
 October the site showed "Loading…" for hours while every health signal stayed
 green.
 
@@ -143,7 +236,7 @@ rolling updates and rollback · a Deployment→StatefulSet migration that preser
 the live PersistentVolume
 
 **Networking**
-Default-deny **ingress and egress** NetworkPolicies, 10 policies, proven in both
+Default-deny **ingress and egress** NetworkPolicies, 18 policies, proven in both
 directions · MetalLB L2 failover demonstrated with 96 consecutive 200s through a
 handover · Traefik as a single front door with TLS termination, HTTP→HTTPS
 redirect and BasicAuth · CoreDNS customisation so pods resolve LAN hostnames
@@ -154,11 +247,12 @@ Faulted* · EBS CSI on EKS with `WaitForFirstConsumer` · PV reclaim policies an
 what `Retain` is actually for
 
 **Testing and delivery gates**
-11 pytest tests — unit via Flask's `test_client`, integration against a **real
-Postgres** service container rather than a mock, because mocking means the SQL
-never runs · a test that asserts a **security property** (`/config` must never
+65 pytest tests across Core, Insight and Deck — unit via Flask's
+`test_client`, integration against a **real Postgres** service container rather
+than a mock, because mocking means the SQL never runs · **69 browser checks** on
+the Portal in headless Chromium · a test that asserts a **security property** (`/config` must never
 expose the password), verified by deliberately breaking it · SonarCloud analysis
-with a **blocking quality gate** · Trivy filesystem, config and image scans, all
+(advisory since 14 Nov — see above) · Trivy filesystem, config and image scans, all
 **blocking**, with accepted exceptions documented and dated · least-privilege
 per-job `permissions`, deny by default
 
@@ -191,8 +285,9 @@ billing
 ## Repository layout
 
 ```
-Makefile                 operator verbs: make status, make pve-verify, make render
+Makefile                 operator verbs: make status, make smoke, make test-web, make render
 api/ web/ reports/ deck/ four services, each with a Dockerfile
+web/tests/               Portal UI checks: Playwright + a mock Core and Insight
 helm/harbourline/        one chart, four values files
 k8s/base/                Kustomize: db, config, ingress, NetworkPolicies
 k8s/argocd/              Argo CD Applications (app-of-apps)
@@ -207,32 +302,9 @@ terraform/kind-bootstrap/  a cluster + Argo CD, from nothing, in four minutes
 terraform/proxmox/       VMs as code on the Proxmox hypervisor
 scripts/                 sealing a credential without it touching disk
 docs/                    architecture, security decisions, runbooks
+docs/images/             Portal screenshots
 tools/                   node prep, a kubectl plugin, a network probe
 ```
-
----
-
-## Access
-
-| Service | URL | Cluster |
-|---|---|---|
-| Application | `http://harbourline.localtest.me` | kind |
-| Grafana (both clusters) | `http://grafana.localtest.me` | kind |
-| Argo CD — applications | `http://argocd.localtest.me` | kind |
-| Argo CD — VM platform | `https://argocd.hl.internal` | VM |
-| Longhorn | `https://longhorn.hl.internal` | VM |
-| Prometheus | `https://prometheus.hl.internal` | VM |
-| Argo CD — Terraform lab | `http://localhost:8080` (port-forward) | `kind-harbourline-tf` |
-| Proxmox VE | `https://192.168.0.50:8006` | hypervisor |
-
-`*.hl.internal` resolves through the workstation's hosts file **and** the kind
-cluster's CoreDNS — browsers and pods are different clients and resolve
-differently. See [`docs/vm-cluster-access.md`](docs/vm-cluster-access.md).
-
-The Terraform lab cluster has no Ingress, so it needs a port-forward and is
-reachable from WSL only —
-[`docs/kind-cluster-access.md`](docs/kind-cluster-access.md) covers both kind
-clusters and the failure modes that look like a broken cluster but are not.
 
 ---
 
@@ -252,9 +324,17 @@ docker run -d --name hl-api --network harbour-net -p 8080:8080 \
 `api/db.env` holds credentials and is intentionally not committed — see
 `api/db.env.example`.
 
-**API endpoints:** `/health` (liveness, returns hostname and environment) ·
-`/config` (non-sensitive effective configuration) · `/dbcheck` (PostgreSQL
-connectivity and row count).
+**Core** (`/api/` behind the Portal) — reads: `/stock` · `/skus` · `/locations` ·
+`/movements` · `/receipts` · `/orders` · `/shipments`; the four transactional
+verbs: `POST /receipts/<id>/receive` · `POST /putaway` ·
+`POST /orders/<id>/pick` · `POST /orders/<id>/dispatch`; plus `/health`,
+`/config` (non-sensitive effective configuration) and `/dbcheck`.
+
+**Insight** (`/reports/`): `reconciliation` · `stock` · `throughput` ·
+`open-orders` · `summary` · `carriers`.
+
+**Tests:** `make test-api` · `make test-reports` · `make test-deck` ·
+`make test-web` — each in a throwaway container on CI's Python, never WSL's.
 
 ---
 
@@ -262,6 +342,7 @@ connectivity and row count).
 
 | Document | What it covers |
 |---|---|
+| [`wms-architecture.md`](docs/wms-architecture.md) | the tier-3 WMS, and what translates to Kubernetes and what does not |
 | [`architecture.md`](docs/architecture.md) | runtime topology, security boundaries, delivery pipeline |
 | [`security-decisions.md`](docs/security-decisions.md) | every hardening decision, and the exceptions **with review dates** |
 | [`vm-cluster.md`](docs/vm-cluster.md) | building the kubeadm cluster, and what actually bit |
@@ -305,6 +386,9 @@ operated.
   `db-init` and the smoke test are PostSync hooks on *different* Applications,
   which Argo syncs independently — the database happened to be seeded 28 seconds
   before the test ran. One Application with ordered sync waves is the real fix.
+- **`docs/wms-architecture.md` predates the 28 Nov rebuild** of the WMS
+  itself — nine tables, the ledger and the reconciliation report are not in it
+  yet.
 - **Headlamp's ServiceAccount is bound to `cluster-admin`** — the only
   non-built-in subject there. Not yet a decision; currently a default.
 - **The Proxmox Terraform provider logs into the hypervisor as `root`.** The

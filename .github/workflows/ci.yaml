@@ -42,7 +42,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # web is nginx serving static files - nothing to unit test.
+        # web is one static HTML file - it has no units, so it is tested
+        # in a browser by test-web below instead.
         component: [api, reports, deck]
 
     # A real Postgres, not a mock. GitHub starts this container alongside the
@@ -102,6 +103,42 @@ jobs:
             ${{ matrix.component }}/test-results.xml
             ${{ matrix.component }}/coverage.xml
           retention-days: 30
+
+  # The Portal is one HTML file with no units to test in isolation, so it is
+  # tested the way an operator uses it: headless Chromium driving the real
+  # web/index.html against mock_backend.py, a stand-in for Core and Insight
+  # that mirrors their response shapes, their 409 refusal bodies and Flask's
+  # RFC 1123 dates. The date format is not incidental - the first Portal
+  # sliced it as ISO and showed garbage timestamps that no API test could see.
+  test-web:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Playwright and Chromium
+        run: |
+          pip install --only-binary=:all: -r web/tests/requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run Portal UI checks
+        env:
+          SHOTS: web/tests/shots
+        run: python web/tests/test_portal.py
+
+      - name: Upload screenshots
+        # Screenshots of a failing run are the evidence; always() keeps them.
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: portal-screenshots
+          path: web/tests/shots
+          retention-days: 14
 
   sonar:
     needs: [test]
@@ -172,10 +209,11 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build:
-    # Nothing is built until the tests pass AND the quality gate is green.
-    # A failing test or a failed gate now stops an image from ever being
-    # produced, rather than being noticed after it is deployed.
-    needs: [test, sonar]
+    # Nothing is built until the tests pass - API, reports, deck AND the
+    # Portal in a browser - and SonarCloud has run. A failing test stops an
+    # image from ever being produced, rather than being noticed after it is
+    # deployed. (The gate itself is advisory since 2026-11-14, see sonar.)
+    needs: [test, test-web, sonar]
     runs-on: ubuntu-24.04
     permissions:
       contents: read

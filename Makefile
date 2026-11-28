@@ -18,7 +18,7 @@ CURL = curlimages/curl:8.11.1
 K = kubectl --context $(CTX)
 
 .PHONY: help status apps sync pve-seal pve-verify pve-logs pve-targets \
-        pve-restart deck-why render schema smoke test-api test-deck test-reports
+        pve-restart deck-why render schema smoke test-api test-deck test-reports test-web
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -115,6 +115,14 @@ schema: ## Objects and row counts the init Job will produce
 test-deck: ## Run the deck suite on CI's Python (no database needed)
 	@docker run --rm -v "$$PWD":/w -w /w/deck python:3.12-slim sh -c \
 	   "pip install -q -r requirements-dev.txt && python -m pytest -q"
+
+test-web: ## Run the Portal UI checks in headless Chromium (no cluster needed)
+	@# Same as the CI job: the real index.html against a mock Core and Insight.
+	@# First run downloads Chromium into the container, about two minutes.
+	@docker run --rm -v "$$PWD":/w -w /w -e SHOTS=web/tests/shots python:3.12-slim sh -c \
+	   "pip install -q --root-user-action=ignore -r web/tests/requirements.txt \
+	    && python -m playwright install --with-deps chromium >/dev/null 2>&1 \
+	    && python web/tests/test_portal.py"
 
 test-reports: ## Run the reports suite on CI's Python against a throwaway Postgres
 	@docker rm -f plimsoll-test-db >/dev/null 2>&1 || true

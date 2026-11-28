@@ -157,12 +157,13 @@ do not remember it, setting a new one is the only option. Do not go looking.
 
 ### Set or reset it - one command
 
-Change the password on the first line and run the whole thing. It writes the
-Secret, waits for Traefik to reload it, then logs in with the password it just
-set and prints the result.
+Run the whole thing; it prompts for the new password without echoing it, so it
+never lands in shell history or in this file. It writes the Secret, waits for
+Traefik to reload it, then logs in with the password it just set and prints the
+result.
 
 ```
-LHPW='Harbourline2026' && printf 'admin:%s\n' "$(openssl passwd -apr1 "$LHPW")" > /tmp/users && kubectl --context harbourline-vm -n longhorn-system create secret generic longhorn-basic-auth --from-file=/tmp/users --dry-run=client -o yaml | kubectl --context harbourline-vm -n longhorn-system apply -f - && rm -f /tmp/users && sleep 5 && curl -k -s -o /dev/null -w 'login test: %{http_code}\n' -u admin:"$LHPW" https://longhorn.hl.internal/
+read -rsp 'New Longhorn password: ' LHPW && echo && printf 'admin:%s\n' "$(openssl passwd -apr1 "$LHPW")" > /tmp/users && kubectl --context harbourline-vm -n longhorn-system create secret generic longhorn-basic-auth --from-file=/tmp/users --dry-run=client -o yaml | kubectl --context harbourline-vm -n longhorn-system apply -f - && rm -f /tmp/users && sleep 5 && curl -k -s -o /dev/null -w 'login test: %{http_code}\n' -u admin:"$LHPW" https://longhorn.hl.internal/
 ```
 
 `login test: 200` - done. Log in as `admin` with that password **in an incognito
