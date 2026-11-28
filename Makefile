@@ -18,7 +18,7 @@ CURL = curlimages/curl:8.11.1
 K = kubectl --context $(CTX)
 
 .PHONY: help status apps sync pve-seal pve-verify pve-logs pve-targets \
-        pve-restart deck-why render schema test-api test-deck test-reports
+        pve-restart deck-why render schema smoke test-api test-deck test-reports
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -91,6 +91,21 @@ test-api: ## Run the api suite on CI's Python against a throwaway Postgres
 	 docker rm -f plimsoll-test-db >/dev/null 2>&1; \
 	 docker network rm plimsoll-test >/dev/null 2>&1; \
 	 exit $$rc
+
+smoke: ## Re-run the post-deployment smoke test and show the result
+	@# The smoke test Job is rendered by the CHART, gated on
+	@# smokeTest.enabled, which only values-web.yaml sets - so re-running it
+	@# means syncing the `web` Application, not `harbourline`. That is not
+	@# guessable from the Job's name or its namespace, and guessing it wrong
+	@# re-runs db-init instead and reports a stale PASS from the previous run.
+	@# Encoded here so nobody has to know. Note the Application is called
+	@# harbourline-web, not web - the FILENAME is web.yaml, which is not the
+	@# object's name. Assuming they match cost a round trip on 28 Nov.
+	@$(K) -n argocd patch application.argoproj.io harbourline-web --type merge \
+	  -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}' >/dev/null
+	@echo "syncing harbourline-web (owner of the smoke test), waiting for the hook..."
+	@sleep 60
+	@$(K) -n harbourline logs job/harbourline-smoke-test --tail=30
 
 schema: ## Objects and row counts the init Job will produce
 	@$(K) -n harbourline exec sts/harbourline-db -- psql -U postgres -c "\\dt" 2>/dev/null \
