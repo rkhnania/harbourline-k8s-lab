@@ -2,375 +2,1539 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Plimsoll — Harbourline Logistics</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1a2b">
+<meta name="description" content="Plimsoll — the Harbourline Logistics warehouse management system.">
+<title>Plimsoll · Harbourline Logistics</title>
+<link id="favicon" rel="icon" href="data:,">
+<!--
+  Plimsoll Portal - Harbourline Logistics.
+
+  ONE FILE, NO FRAMEWORK, NO BUILD STEP, ZERO EXTERNAL REQUESTS.
+  This tier is nginx serving a single static document. Fonts are the system
+  stack, icons are an inline SVG sprite, and every byte ships inside the image.
+  That keeps the properties the rest of the platform relies on: nothing new for
+  Trivy to scan, no supply chain, nothing that breaks when a CDN moves, and a
+  page that works in a cluster with locked-down egress.
+
+  BRAND. The anchor-and-wave mark and the blue-to-teal gradient (#0369a1 to
+  #0d9488) come from the original Harbourline portal, commit a551386. No logo
+  file or brand guide exists in the repository, so that commit IS the brand.
+  Every colour below is a token derived from it.
+-->
 <style>
+:root{
+  color-scheme: light;
+  /* Brand - from commit a551386 */
+  --brand-blue:#0369a1; --brand-teal:#0d9488;
+  --brand-grad:linear-gradient(120deg,#0369a1 0%,#0d9488 100%);
+  --hero-grad:linear-gradient(120deg,#0369a1 0%,#0b7f8f 55%,#0d9488 100%);
+  --navy-950:#06111d; --navy-900:#0a1a2b; --navy-800:#10253b; --navy-700:#183450;
+  --side-ink:#e7eef6; --side-muted:#8ea6bd; --side-soft:#c4d3e2;
+
+  /* Canvas */
+  --bg:#f2f5f9; --surface:#ffffff; --surface-2:#f8fafc; --surface-3:#edf1f6;
+  --line:#e2e8f0; --line-strong:#cbd5e1;
+  --ink:#0f1b2b; --ink-2:#334155; --muted:#64748b; --faint:#94a3b8;
+
+  /* The single action colour. teal-700 rather than the brand teal itself,
+     because white text on #0d9488 is 3.7:1 and fails WCAG AA for body text;
+     on #0f766e it is 5.5:1. */
+  --primary:#0f766e; --primary-hover:#115e59; --on-primary:#ffffff;
+  --primary-soft:#e3f5f2; --primary-soft-ink:#0f766e;
+  --warn-btn:#b45309; --warn-btn-hover:#92400e; --on-warn:#ffffff;
+
+  /* Signal colours. The status hues are the original portal's. */
+  --info:#0369a1; --info-soft:#e0f2fe;
+  --ok:#15803d;   --ok-soft:#dcfce7;
+  --warn:#b45309; --warn-soft:#fef3c7;
+  --bad:#be123c;  --bad-soft:#ffe4e6;
+  --violet:#4338ca; --violet-soft:#e0e7ff;
+  --slate:#475569; --slate-soft:#eef2f6;
+
+  --ring:0 0 0 3px rgba(13,148,136,.32);
+  --shadow-1:0 1px 2px rgba(15,27,43,.05),0 1px 3px rgba(15,27,43,.05);
+  --shadow-2:0 10px 24px -12px rgba(15,27,43,.22),0 2px 6px -2px rgba(15,27,43,.06);
+  --shadow-3:0 28px 56px -16px rgba(15,27,43,.35);
+  --r-sm:8px; --r:12px; --r-lg:16px;
+  --font:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --side-w:264px;
+}
+@media (prefers-color-scheme: dark){
   :root{
-    --bg:#0f1419; --panel:#161c23; --line:#232c36; --fg:#dde5ec; --dim:#8a97a4;
-    --accent:#3fb6a8; --warn:#d9a441; --bad:#d9534f; --good:#5aa469;
-    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    color-scheme: dark;
+    --hero-grad:linear-gradient(120deg,#075985 0%,#0b6672 55%,#0f766e 100%);
+    --navy-950:#040c16; --navy-900:#07131f; --navy-800:#0c1d30;
+    --bg:#09121e; --surface:#0f1a29; --surface-2:#0c1624; --surface-3:#15243a;
+    --line:#1b2a3f; --line-strong:#2a3c55;
+    --ink:#e6edf6; --ink-2:#c3cfdd; --muted:#8fa1b6; --faint:#5f7189;
+    --primary:#14b8a6; --primary-hover:#2dd4bf; --on-primary:#042f2c;
+    --primary-soft:rgba(20,184,166,.14); --primary-soft-ink:#5eead4;
+    --warn-btn:#f59e0b; --warn-btn-hover:#fbbf24; --on-warn:#2a1700;
+    --info:#7dd3fc; --info-soft:rgba(56,189,248,.14);
+    --ok:#4ade80;   --ok-soft:rgba(74,222,128,.13);
+    --warn:#fbbf24; --warn-soft:rgba(251,191,36,.13);
+    --bad:#fb7185;  --bad-soft:rgba(251,113,133,.14);
+    --violet:#a5b4fc; --violet-soft:rgba(129,140,248,.16);
+    --slate:#cbd5e1; --slate-soft:rgba(148,163,184,.14);
+    --ring:0 0 0 3px rgba(45,212,191,.35);
+    --shadow-1:0 1px 2px rgba(0,0,0,.35);
+    --shadow-2:0 12px 28px -14px rgba(0,0,0,.7);
+    --shadow-3:0 28px 56px -16px rgba(0,0,0,.75);
   }
-  @media (prefers-color-scheme:light){
-    :root{--bg:#f4f6f8;--panel:#fff;--line:#dde3e9;--fg:#1b2730;--dim:#5e6e7c;}
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);
-       font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-  header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;
-         padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
-  .brand{font-weight:700;letter-spacing:.14em;font-size:19px}
-  .brand span{color:var(--accent)}
-  .sub{color:var(--dim);font-size:13px}
-  .spacer{flex:1}
-  .chip{font-family:var(--mono);font-size:12px;color:var(--dim);
-        border:1px solid var(--line);border-radius:999px;padding:3px 10px}
-  .chip b{color:var(--fg);font-weight:600}
-  .badge{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;
-         border-radius:999px;padding:4px 12px}
-  .ok{background:rgba(90,164,105,.15);color:var(--good);border:1px solid var(--good)}
-  .no{background:rgba(217,83,79,.15);color:var(--bad);border:1px solid var(--bad)}
-  input{background:var(--bg);color:var(--fg);border:1px solid var(--line);
-        border-radius:6px;padding:5px 9px;font:inherit;font-family:var(--mono);font-size:13px}
-  nav{display:flex;gap:2px;padding:0 20px;border-bottom:1px solid var(--line);
-      background:var(--panel);overflow-x:auto}
-  nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);
-             padding:11px 15px;font:inherit;cursor:pointer;white-space:nowrap}
-  nav button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--accent)}
-  main{padding:20px;max-width:1200px}
-  h2{font-size:14px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);
-     margin:0 0 10px}
-  .cards{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
-        padding:12px 16px;min-width:120px}
-  .card .n{font-family:var(--mono);font-size:24px;font-weight:600}
-  .card .l{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
-  table{width:100%;border-collapse:collapse;background:var(--panel);
-        border:1px solid var(--line);border-radius:10px;overflow:hidden}
-  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;
-     color:var(--dim);padding:9px 12px;border-bottom:1px solid var(--line);font-weight:600}
-  td{padding:9px 12px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px}
-  tr:last-child td{border-bottom:0}
-  .num{text-align:right;font-variant-numeric:tabular-nums}
-  .muted{color:var(--dim)}
-  button.act{background:var(--accent);color:#06211f;border:0;border-radius:6px;
-             padding:5px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
-  button.act.ghost{background:none;color:var(--accent);border:1px solid var(--accent)}
-  button.act:disabled{opacity:.4;cursor:not-allowed}
-  .flash{margin-bottom:14px;padding:10px 14px;border-radius:8px;font-family:var(--mono);
-         font-size:13px;display:none}
-  .flash.show{display:block}
-  .flash.good{background:rgba(90,164,105,.14);border:1px solid var(--good);color:var(--good)}
-  .flash.bad{background:rgba(217,83,79,.14);border:1px solid var(--bad);color:var(--bad)}
-  .wrap{overflow-x:auto}
-  .z{display:inline-block;font-size:11px;padding:1px 7px;border-radius:4px;
-     border:1px solid var(--line);color:var(--dim)}
-  footer{padding:16px 20px;color:var(--dim);font-size:12px;border-top:1px solid var(--line)}
+}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:400 14.5px/1.55 var(--font);
+     -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:inherit}
+code{font-family:var(--mono);font-size:.92em}
+button{font:inherit}
+[hidden]{display:none!important}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;
+    stroke-linecap:round;stroke-linejoin:round}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ------------------------------------------------------------- shell */
+.app{display:grid;grid-template-columns:var(--side-w) minmax(0,1fr);min-height:100vh;min-height:100dvh;
+  /* the sidebar is sticky at viewport height; this paints its column the full
+     length of the page so a full-page capture never shows a cut-off rail */
+  background:linear-gradient(90deg,var(--navy-950) 0 var(--side-w),transparent var(--side-w))}
+
+.sidebar{position:sticky;top:0;height:100vh;height:100dvh;display:flex;flex-direction:column;gap:24px;
+  padding:20px 14px;color:var(--side-ink);overflow-y:auto;
+  background:
+    radial-gradient(120% 55% at 0% 100%,rgba(13,148,136,.22),transparent 62%),
+    radial-gradient(90% 40% at 100% 0%,rgba(3,105,161,.18),transparent 60%),
+    linear-gradient(180deg,var(--navy-900),var(--navy-950));
+  border-right:1px solid rgba(255,255,255,.05)}
+
+.brand{display:flex;align-items:center;gap:12px;padding:4px 8px;text-decoration:none;border-radius:12px}
+.brand:focus-visible{outline:none;box-shadow:0 0 0 2px #5eead4}
+.mark{width:42px;height:42px;border-radius:12px;background:var(--brand-grad);display:grid;place-items:center;flex:none;
+  box-shadow:0 8px 18px -8px rgba(13,148,136,.75),inset 0 1px 0 rgba(255,255,255,.28)}
+.mark svg{width:30px;height:30px}
+.mark.sm{width:36px;height:36px;border-radius:10px}
+.mark.sm svg{width:25px;height:25px}
+.brand-name{display:block;font-weight:750;font-size:17px;letter-spacing:-.015em;color:#fff;line-height:1.1}
+.brand-prod{display:block;font-size:10.5px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:#5eead4;margin-top:4px}
+
+.nav{display:flex;flex-direction:column;gap:18px}
+.nav-group{display:flex;flex-direction:column;gap:4px}
+.nav-label{font-size:10.5px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--side-muted);padding:0 12px;margin-bottom:4px}
+.nav-btn{position:relative;display:flex;align-items:center;gap:12px;min-height:44px;padding:10px 12px;border-radius:11px;
+  color:var(--side-soft);text-decoration:none;font-weight:560;font-size:14.5px;
+  transition:background .16s ease,color .16s ease,box-shadow .16s ease}
+.nav-btn .ic{width:20px;height:20px;opacity:.9}
+.nav-btn:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav-btn:focus-visible{outline:none;box-shadow:0 0 0 2px #5eead4}
+.nav-btn[aria-current="page"]{color:#fff;
+  background:linear-gradient(120deg,rgba(3,105,161,.62),rgba(13,148,136,.62));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 10px 22px -12px rgba(13,148,136,.85)}
+.nav-btn[aria-current="page"]::before{content:"";position:absolute;left:-14px;top:11px;bottom:11px;width:4px;border-radius:0 4px 4px 0;background:#5eead4}
+.nav-btn .count{margin-left:auto;min-width:22px;height:20px;padding:0 7px;border-radius:999px;display:grid;place-items:center;
+  background:rgba(94,234,212,.16);color:#99f6e4;font-size:11.5px;font-weight:750;font-variant-numeric:tabular-nums}
+.nav-btn[aria-current="page"] .count{background:rgba(255,255,255,.22);color:#fff}
+.nav-btn .dot{margin-left:auto;width:9px;height:9px;border-radius:50%;background:#4ade80;box-shadow:0 0 0 3px rgba(74,222,128,.18)}
+.nav-btn .dot.bad{background:#fb7185;box-shadow:0 0 0 3px rgba(251,113,133,.22)}
+
+.side-foot{margin-top:auto;display:grid;gap:8px;padding:14px;border-radius:14px;font-size:12px;color:var(--side-muted);
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07)}
+.live{display:inline-flex;align-items:center;gap:8px;color:#a7f3d0;font-weight:650;font-size:12px}
+.live::before{content:"";width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:pulse 2.4s infinite}
+.live.off{color:#fda4af}.live.off::before{background:#fb7185;animation:none}
+.sf-row{display:flex;justify-content:space-between;gap:10px;min-width:0}
+.sf-row b{color:var(--side-ink);font:500 11.5px var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:16px;padding:16px 32px;
+  background:var(--bg);border-bottom:1px solid var(--line)}
+@supports (backdrop-filter:blur(8px)){
+  .topbar{background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:saturate(1.5) blur(12px)}
+}
+.m-brand{display:none;text-decoration:none}
+.page-head{min-width:0}
+.page-head h1{margin:0;font-size:22px;font-weight:750;letter-spacing:-.02em;line-height:1.2}
+.page-head p{margin:2px 0 0;color:var(--muted);font-size:13.5px}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+.updated{font-size:12px;color:var(--muted);white-space:nowrap}
+.pill-status{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 13px;border-radius:999px;
+  font-size:12.5px;font-weight:650;text-decoration:none;border:1px solid transparent;white-space:nowrap;transition:filter .15s}
+.pill-status:hover{filter:brightness(.97)}
+.pill-status .ic{width:16px;height:16px}
+.pill-status.ok{color:var(--ok);background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 28%,transparent)}
+.pill-status.bad{color:var(--bad);background:var(--bad-soft);border-color:color-mix(in srgb,var(--bad) 32%,transparent)}
+.pill-status.wait{color:var(--muted);background:var(--surface-3)}
+.icon-btn{width:38px;height:38px;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);
+  display:grid;place-items:center;cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+.icon-btn:hover{border-color:var(--line-strong);color:var(--ink);background:var(--surface-2)}
+.icon-btn:focus-visible{outline:none;box-shadow:var(--ring)}
+.icon-btn.spin .ic{animation:spin .8s linear infinite}
+.operator{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px 0 4px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);transition:border-color .15s,background .15s}
+.operator:hover{border-color:var(--line-strong);background:var(--surface-2)}
+.operator:focus-visible{outline:none;box-shadow:var(--ring)}
+.operator.unset{border-color:color-mix(in srgb,var(--warn) 55%,transparent);background:var(--warn-soft)}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--brand-grad);color:#fff;display:grid;place-items:center;
+  font-weight:750;font-size:12px;letter-spacing:.02em;flex:none}
+.avatar.unset{background:var(--warn);color:#fff}
+.avatar .ic{width:16px;height:16px}
+.operator .meta{display:grid;text-align:left;line-height:1.15}
+.operator .who{font-size:13px;font-weight:650}
+.operator .role{font-size:11px;color:var(--muted)}
+
+.view{padding:28px 32px 40px;max-width:1380px;width:100%}
+.view:focus{outline:none}
+.enter>*{animation:rise .32s cubic-bezier(.2,.8,.2,1) both}
+.enter>*:nth-child(2){animation-delay:.04s}.enter>*:nth-child(3){animation-delay:.08s}.enter>*:nth-child(4){animation-delay:.12s}
+.foot{margin-top:auto;padding:18px 32px 26px;color:var(--faint);font-size:12px;border-top:1px solid var(--line)}
+
+/* --------------------------------------------------------- components */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-1);overflow:hidden}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.card-head h2{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em}
+.card-head .sub{font-size:12.5px;color:var(--muted);margin-top:1px}
+.link{color:var(--primary);font-size:13px;font-weight:650;text-decoration:none;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.link:hover{text-decoration:underline}
+.link .ic{width:15px;height:15px}
+.stack{display:grid;gap:16px}
+
+.hero{position:relative;overflow:hidden;border-radius:var(--r-lg);padding:26px 28px;margin-bottom:20px;color:#fff;
+  background:var(--hero-grad);box-shadow:0 20px 44px -24px rgba(3,105,161,.75)}
+.hero .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;opacity:.8}
+.hero h2{margin:6px 0 0;font-size:24px;font-weight:750;letter-spacing:-.02em;line-height:1.2}
+.hero p{margin:6px 0 0;opacity:.92;font-size:14.5px;max-width:62ch}
+.hero .wm{position:absolute;right:-36px;top:50%;width:240px;height:240px;transform:translateY(-50%);opacity:.14;pointer-events:none}
+.hero-actions{margin-top:18px;display:flex;flex-wrap:wrap;gap:10px;position:relative}
+
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:20px}
+.kpi{display:block;padding:18px 20px;text-decoration:none;color:inherit;position:relative;
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-2);border-color:var(--line-strong)}
+.kpi:focus-visible{outline:none;box-shadow:var(--ring)}
+.k-top{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--muted);font-size:12.5px;font-weight:650}
+.k-ico{width:36px;height:36px;border-radius:11px;display:grid;place-items:center}
+.k-ico .ic{width:19px;height:19px}
+.k-val{font-size:30px;font-weight:780;letter-spacing:-.03em;margin-top:10px;line-height:1.05;font-variant-numeric:tabular-nums}
+.k-val small{font-size:14px;font-weight:600;color:var(--muted);letter-spacing:0;margin-left:4px}
+.k-foot{margin-top:6px;font-size:12.5px;color:var(--muted)}
+.kpi.ok .k-val{color:var(--ok)} .kpi.bad .k-val{color:var(--bad)}
+.kpi.ok::after,.kpi.bad::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--ok)}
+.kpi.bad::after{background:var(--bad)}
+
+.two-col{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;margin-bottom:16px}
+
+/* tones - shared by pills, zone tags and icon tiles */
+.t-info{color:var(--info);background:var(--info-soft)}
+.t-ok{color:var(--ok);background:var(--ok-soft)}
+.t-warn{color:var(--warn);background:var(--warn-soft)}
+.t-bad{color:var(--bad);background:var(--bad-soft)}
+.t-teal{color:var(--primary-soft-ink);background:var(--primary-soft)}
+.t-violet{color:var(--violet);background:var(--violet-soft)}
+.t-slate{color:var(--slate);background:var(--slate-soft)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:650;white-space:nowrap;letter-spacing:.005em}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.zone{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:7px;font-size:12px;font-weight:650;white-space:nowrap}
+.haz{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:6px;font:700 11px var(--mono);
+  color:var(--bad);background:var(--bad-soft);vertical-align:1px;margin-left:6px}
+.haz .ic{width:12px;height:12px;stroke-width:2.2}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 15px;border-radius:10px;
+  border:1px solid transparent;font:650 13.5px/1 var(--font);cursor:pointer;white-space:nowrap;text-decoration:none;
+  transition:background .15s,border-color .15s,box-shadow .15s,transform .06s,color .15s}
+.btn .ic{width:16px;height:16px}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:none;box-shadow:var(--ring)}
+.btn-primary{background:var(--primary);color:var(--on-primary);box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 4px 10px -4px rgba(15,118,110,.55)}
+.btn-primary:hover{background:var(--primary-hover)}
+.btn-secondary{background:var(--surface);color:var(--ink);border-color:var(--line-strong)}
+.btn-secondary:hover{background:var(--surface-3)}
+.btn-ghost{background:transparent;color:var(--ink-2)}
+.btn-ghost:hover{background:var(--surface-3);color:var(--ink)}
+.btn-warn{background:var(--warn-btn);color:var(--on-warn)}
+.btn-warn:hover{background:var(--warn-btn-hover)}
+.btn-light{background:#fff;color:#0b4560;box-shadow:0 6px 16px -8px rgba(0,0,0,.45)}
+.btn-light:hover{background:#f0fdfa}
+.btn-glass{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.3)}
+.btn-glass:hover{background:rgba(255,255,255,.24)}
+.btn-sm{height:32px;padding:0 12px;font-size:12.5px;border-radius:9px}
+.btn:disabled{opacity:.42;cursor:not-allowed;transform:none;box-shadow:none}
+.btn.is-busy{pointer-events:none;opacity:.88}
+.btn.is-busy::before{content:"";width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;animation:spin .7s linear infinite}
+.btn.is-busy .ic{display:none}
+
+/* inputs */
+.input{width:100%;height:38px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);
+  font:inherit;font-size:14px;padding:0 12px;transition:border-color .15s,box-shadow .15s}
+.input::placeholder{color:var(--faint)}
+.input:hover{border-color:color-mix(in srgb,var(--line-strong) 60%,var(--ink) 25%)}
+.input:focus{outline:none;border-color:var(--primary);box-shadow:var(--ring)}
+select.input{appearance:none;padding-right:36px;cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;background-size:18px}
+.input[type=number]{font-variant-numeric:tabular-nums}
+
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+.search{position:relative;flex:1 1 260px;max-width:380px}
+.search .ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--faint)}
+.search .input{padding-left:36px}
+.search kbd{position:absolute;right:10px;top:50%;transform:translateY(-50%);font:600 11px var(--mono);color:var(--faint);
+  border:1px solid var(--line-strong);border-radius:5px;padding:1px 6px;background:var(--surface-2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);font:650 12.5px var(--font);
+  transition:background .15s,border-color .15s,color .15s}
+.chip:hover{border-color:var(--primary);color:var(--ink)}
+.chip:focus-visible{outline:none;box-shadow:var(--ring)}
+.chip[aria-pressed="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.chip .n{font-variant-numeric:tabular-nums;opacity:.72;font-weight:600}
+.switch{display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2);margin-left:auto;user-select:none}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.switch .track{width:36px;height:21px;border-radius:999px;background:var(--line-strong);position:relative;transition:background .18s}
+.switch .track::after{content:"";position:absolute;left:3px;top:3px;width:15px;height:15px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .18s}
+.switch input:checked+.track{background:var(--primary)}
+.switch input:checked+.track::after{transform:translateX(15px)}
+.switch input:focus-visible+.track{box-shadow:var(--ring)}
+.seg{display:inline-flex;padding:4px;border-radius:12px;background:var(--surface-3);gap:2px}
+.seg button{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 15px;border:0;border-radius:9px;background:transparent;
+  color:var(--muted);font:650 13px var(--font);cursor:pointer;transition:background .15s,color .15s}
+.seg button:hover{color:var(--ink)}
+.seg button:focus-visible{outline:none;box-shadow:var(--ring)}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-1)}
+.seg .n{font-variant-numeric:tabular-nums;font-size:11.5px;padding:1px 7px;border-radius:999px;background:var(--surface-3)}
+.seg button[aria-selected="true"] .n{background:var(--primary-soft);color:var(--primary-soft-ink)}
+
+/* tables */
+.tbl-wrap{overflow-x:auto}
+.tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
+.tbl th{text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+  background:var(--surface-2);padding:11px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:0}
+.tbl tbody tr{transition:background .12s}
+.tbl tbody tr:hover{background:var(--surface-2)}
+.tbl .num{text-align:right;font-variant-numeric:tabular-nums}
+.tbl .act{text-align:right;white-space:nowrap}
+.tbl tr.is-empty td{color:var(--faint)}
+.tbl tr.is-empty .sku{color:var(--muted)}
+.sku{font:650 12.5px var(--mono);letter-spacing:.01em;color:var(--ink)}
+.desc{color:var(--muted);font-size:12.5px;margin-top:2px}
+.loc{font:600 12.5px var(--mono);color:var(--ink-2)}
+.qty{font-weight:750;font-size:15px;font-variant-numeric:tabular-nums}
+.uom{font-size:11px;color:var(--faint);font-weight:650;margin-left:4px;letter-spacing:.04em}
+.plus{color:var(--ok)} .minus{color:var(--warn)}
+.route{display:inline-flex;align-items:center;gap:8px;font:600 12.5px var(--mono);color:var(--ink-2);white-space:nowrap}
+.route .ic{width:14px;height:14px;color:var(--faint)}
+.route .ext{font-family:var(--font);font-weight:600;color:var(--faint);font-size:12px}
+.who{display:flex;align-items:center;gap:9px;white-space:nowrap}
+.who .avatar{width:26px;height:26px;font-size:10.5px}
+.who .avatar.sys{background:var(--slate-soft);color:var(--slate)}
+.who .via{font-size:11.5px;color:var(--faint)}
+.tbl-foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:12px 16px;border-top:1px solid var(--line);
+  background:var(--surface-2);font-size:12.5px;color:var(--muted)}
+.tbl-foot b{color:var(--ink);font-variant-numeric:tabular-nums}
+time{white-space:nowrap}
+
+/* documents - receipts and orders */
+.doc-head{display:flex;flex-wrap:wrap;align-items:center;gap:16px 28px;padding:18px 20px;border-bottom:1px solid var(--line)}
+.doc-id{display:flex;align-items:center;gap:14px;min-width:0;flex:1 1 300px}
+.doc-ico{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;flex:none}
+.doc-ico .ic{width:22px;height:22px}
+.doc-title{display:flex;align-items:center;flex-wrap:wrap;gap:10px;font-weight:750;font-size:16px;letter-spacing:-.01em}
+.doc-title .id{font-family:var(--mono);font-size:15px;letter-spacing:0}
+.doc-meta{font-size:13px;color:var(--muted);margin-top:3px}
+.doc-progress{flex:0 1 300px;min-width:210px}
+.dp-top{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.dp-top b{color:var(--ink);font-size:13px;font-variant-numeric:tabular-nums}
+.doc-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;
+  border-top:1px solid var(--line);background:var(--surface-2)}
+.hint{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.hint .ic{width:16px;height:16px}
+.done{display:inline-flex;align-items:center;gap:6px;color:var(--ok);font-weight:650;font-size:12.5px}
+.done .ic{width:16px;height:16px;stroke-width:2.2}
+.qty-ctl{display:inline-flex;align-items:center;gap:8px}
+.qty-ctl .input{width:88px;height:34px;text-align:right;font-size:13.5px}
+.shipped .doc-head{border-bottom:0}
+.lines-chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 18px 80px}
+.lchip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:8px;background:var(--surface-2);
+  border:1px solid var(--line);font:600 12px var(--mono);color:var(--ink-2)}
+.lchip b{font-family:var(--font);color:var(--ink)}
+
+.progress{height:8px;border-radius:999px;background:var(--surface-3);overflow:hidden}
+.progress>span{display:block;height:100%;border-radius:inherit;background:var(--brand-grad);transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.progress.lg{height:10px}
+.bar-info>span{background:var(--info)} .bar-violet>span{background:var(--violet)}
+.bar-teal>span{background:var(--brand-teal)} .bar-warn>span{background:var(--warn)} .bar-ok>span{background:var(--ok)}
+
+/* overview widgets */
+.zones{padding:8px 20px 14px}
+.zone-row{display:grid;grid-template-columns:minmax(130px,170px) 1fr 118px;align-items:center;gap:18px;padding:13px 0;border-bottom:1px dashed var(--line)}
+.zone-row:last-child{border-bottom:0}
+.zr-name{font-weight:650;font-size:13.5px;display:flex;align-items:center;gap:9px}
+.zr-name i{width:10px;height:10px;border-radius:3px;flex:none}
+.zr-sub{font-size:12px;color:var(--muted);margin-top:1px;padding-left:19px}
+.zr-val{text-align:right;font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink-2)}
+.zr-val b{font-size:15px;color:var(--ink)}
+.zr-val span{display:block;font-size:11.5px;color:var(--faint)}
+
+.queue{list-style:none;margin:0;padding:8px}
+.q-item{display:flex;align-items:center;gap:14px;padding:12px;border-radius:12px;text-decoration:none;color:inherit;transition:background .15s}
+.q-item:hover{background:var(--surface-2)}
+.q-item:hover .q-go{color:var(--primary);transform:translateX(2px)}
+.q-item:focus-visible{outline:none;box-shadow:var(--ring)}
+.q-ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none}
+.q-ico .ic{width:19px;height:19px}
+.q-title{font-weight:650;font-size:14px}
+.q-meta{font-size:12.5px;color:var(--muted);margin-top:1px}
+.q-go{margin-left:auto;color:var(--faint);transition:transform .15s,color .15s}
+
+.feed{list-style:none;margin:0;padding:8px 20px 14px}
+.feed li{position:relative;display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:14px;align-items:start;padding:11px 0}
+.feed li:not(:last-child)::after{content:"";position:absolute;left:16.5px;top:46px;bottom:-4px;width:1px;background:var(--line)}
+.f-ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center}
+.f-ico .ic{width:17px;height:17px}
+.f-text{font-size:13.5px;line-height:1.45}
+.f-text b{font-weight:650}
+.f-text .mono{font:600 12.5px var(--mono)}
+.f-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.f-time{font-size:12px;color:var(--faint);padding-top:2px}
+
+.bars{display:grid;gap:14px;padding:18px 20px 20px}
+.bar-row{display:grid;grid-template-columns:minmax(110px,150px) 1fr 96px;gap:14px;align-items:center;font-size:13px}
+.bar-row .lab{display:flex;align-items:center;gap:8px;font-weight:600;min-width:0}
+.bar-row .lab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-row .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+.bar-row .val small{color:var(--faint);margin-left:4px}
+
+.verdict{display:flex;flex-wrap:wrap;align-items:center;gap:22px;padding:26px 28px;margin-bottom:20px;border-radius:var(--r-lg);
+  border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow-1);position:relative;overflow:hidden}
+.verdict::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--ok)}
+.verdict.bad::before{background:var(--bad)}
+.v-badge{width:72px;height:72px;border-radius:20px;display:grid;place-items:center;flex:none}
+.v-badge .ic{width:36px;height:36px;stroke-width:1.7}
+.v-body{flex:1 1 320px;min-width:0}
+.v-eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.v-title{margin:4px 0 0;font-size:24px;font-weight:780;letter-spacing:-.02em}
+.verdict.ok .v-title{color:var(--ok)} .verdict.bad .v-title{color:var(--bad)}
+.v-text{margin:6px 0 0;color:var(--ink-2);font-size:14px;max-width:70ch}
+.v-meta{margin-top:10px;font-size:12.5px;color:var(--muted)}
+
+.empty{display:grid;justify-items:center;text-align:center;padding:52px 24px;color:var(--muted)}
+.e-ico{width:56px;height:56px;border-radius:17px;display:grid;place-items:center;margin-bottom:14px}
+.e-ico .ic{width:26px;height:26px}
+.empty h3{margin:0 0 4px;color:var(--ink);font-size:15.5px;font-weight:700}
+.empty p{margin:0;max-width:46ch;font-size:13.5px}
+.empty .btn{margin-top:16px}
+
+.sk{border-radius:10px;background:linear-gradient(90deg,var(--surface-3) 25%,var(--surface-2) 40%,var(--surface-3) 60%);
+  background-size:300% 100%;animation:shimmer 1.3s ease-in-out infinite}
+
+/* toasts */
+#toasts{position:fixed;bottom:22px;right:22px;z-index:200;display:flex;flex-direction:column;gap:10px;width:min(400px,calc(100vw - 36px));pointer-events:none}
+.toast{pointer-events:auto;display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:12px;align-items:start;padding:14px 12px 14px 14px;
+  border-radius:14px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-3);animation:tin .28s cubic-bezier(.2,.8,.2,1)}
+.toast .t-ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center}
+.toast .t-ico .ic{width:17px;height:17px;stroke-width:2.1}
+.toast.success .t-ico{color:var(--ok);background:var(--ok-soft)}
+.toast.error .t-ico{color:var(--bad);background:var(--bad-soft)}
+.toast.success{border-left:3px solid var(--ok)} .toast.error{border-left:3px solid var(--bad)}
+.t-title{font-weight:700;font-size:13.5px;line-height:1.35}
+.t-msg{font-size:13px;color:var(--ink-2);margin-top:2px;overflow-wrap:anywhere}
+.toast .x{border:0;background:none;color:var(--faint);cursor:pointer;padding:4px;border-radius:6px;display:grid}
+.toast .x:hover{color:var(--ink);background:var(--surface-3)}
+.toast .x .ic{width:15px;height:15px}
+.toast.out{animation:tout .2s ease forwards}
+
+/* dialog */
+dialog#modal{border:0;padding:0;background:transparent;width:500px;max-width:calc(100vw - 24px);color:var(--ink);overflow:visible}
+dialog#modal::backdrop{background:rgba(6,17,29,.55);backdrop-filter:blur(3px)}
+.modal-card{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow-3);overflow:hidden;animation:pop .22s cubic-bezier(.2,.8,.2,1)}
+.modal-card header{display:flex;gap:14px;align-items:flex-start;padding:22px 24px 4px}
+.m-ico{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;flex:none}
+.m-ico .ic{width:21px;height:21px}
+.modal-card h2{margin:0;font-size:18px;font-weight:750;letter-spacing:-.015em}
+.modal-card header p{margin:3px 0 0;color:var(--muted);font-size:13.5px}
+.modal-body{display:grid;gap:16px;padding:18px 24px 4px}
+.modal-card footer{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;margin-top:20px;background:var(--surface-2);border-top:1px solid var(--line)}
+.field{display:grid;gap:7px}
+.field>span{font-size:12.5px;font-weight:650;color:var(--ink-2)}
+.field small{color:var(--muted);font-size:12px}
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.fact{padding:11px 13px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);min-width:0}
+.fact .l{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.fact .v{font-weight:700;font-size:15px;margin-top:3px;font-variant-numeric:tabular-nums}
+.fact .v.mono{font:650 13.5px var(--mono)}
+.fact .s{font-size:12px;color:var(--muted);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.callout{display:flex;gap:11px;align-items:flex-start;padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.45}
+.callout .ic{width:18px;height:18px;margin-top:1px}
+.callout.warn{background:var(--warn-soft);color:var(--warn)}
+.callout.bad{background:var(--bad-soft);color:var(--bad)}
+.callout b{font-weight:700}
+
+/* keyframes */
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.55)}70%{box-shadow:0 0 0 8px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes shimmer{0%{background-position:100% 50%}100%{background-position:0 50%}}
+@keyframes tin{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes tout{to{opacity:0;transform:translateX(16px)}}
+@keyframes pop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+
+/* ---------------------------------------------------------- responsive */
+@media (max-width:1240px){
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .two-col{grid-template-columns:minmax(0,1fr)}
+}
+/* Tablet: the sidebar becomes an icon rail. Same markup, same buttons. */
+@media (max-width:1099px) and (min-width:720px){
+  :root{--side-w:92px}
+  .sidebar{padding:18px 10px;align-items:stretch}
+  .brand{justify-content:center;padding:0}
+  .brand-text,.nav-label,.side-foot{display:none}
+  .nav{gap:10px}
+  .nav-btn{flex-direction:column;justify-content:center;gap:5px;min-height:62px;padding:9px 4px;font-size:11px;font-weight:650;text-align:center}
+  .nav-btn .ic{width:22px;height:22px}
+  .nav-btn .count,.nav-btn .dot{position:absolute;top:6px;right:12px;margin:0}
+  .nav-btn .count{min-width:19px;height:18px;padding:0 5px;font-size:10.5px}
+  .nav-btn[aria-current="page"]::before{left:-10px}
+  .topbar{padding:14px 24px}
+  .view{padding:24px}
+  .foot{padding:16px 24px 22px}
+  .updated{display:none}
+}
+/* Phone: a thumb-reachable bottom bar. Warehouse staff use handhelds. */
+@media (max-width:719px){
+  .app{grid-template-columns:minmax(0,1fr);background:none}
+  .sidebar{position:fixed;inset:auto 0 0 0;height:auto;z-index:60;flex-direction:row;gap:0;overflow:visible;
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid rgba(255,255,255,.09);
+    background:var(--navy-900);box-shadow:0 -10px 30px -12px rgba(0,0,0,.45)}
+  .brand,.nav-label,.side-foot{display:none}
+  .nav{flex-direction:row;width:100%;gap:2px}
+  .nav-group{display:contents}
+  .nav-btn{flex:1 1 0;min-width:0;flex-direction:column;justify-content:center;gap:3px;min-height:56px;padding:7px 2px;
+    font-size:10.5px;font-weight:650;border-radius:12px;text-align:center}
+  .nav-btn .ic{width:22px;height:22px}
+  .nav-btn .lbl{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .nav-btn .count,.nav-btn .dot{position:absolute;top:4px;left:calc(50% + 6px);margin:0}
+  .nav-btn .count{min-width:18px;height:17px;padding:0 5px;font-size:10px}
+  .nav-btn[aria-current="page"]::before{left:26%;right:26%;top:-6px;bottom:auto;width:auto;height:3px;border-radius:0 0 3px 3px}
+  .main{padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+  .topbar{padding:10px 16px;gap:12px}
+  .m-brand{display:block}
+  .page-head h1{font-size:18px}
+  .page-head p,.updated,.pill-status .txt,.operator .meta{display:none}
+  .pill-status{width:38px;padding:0;justify-content:center}
+  .operator{padding:0 3px;height:40px}
+  .view{padding:16px 14px 24px}
+  .foot{display:none}
+  .hero{padding:22px 20px}.hero h2{font-size:20px}.hero .wm{width:170px;height:170px;right:-50px}
+  .kpis{gap:12px;margin-bottom:16px}
+  .kpi{padding:14px 15px}.k-val{font-size:24px}.k-ico{width:32px;height:32px}
+  .zone-row{grid-template-columns:minmax(0,1fr) auto;gap:8px 14px}
+  .zone-row .progress{grid-column:1/-1;order:3}
+  .bar-row{grid-template-columns:minmax(0,1fr) auto}
+  .bar-row .progress{grid-column:1/-1;order:3}
+  .toolbar{padding:12px}
+  .search{max-width:none;flex-basis:100%}
+  .search kbd{display:none}
+  .switch{margin-left:0}
+  .doc-head{padding:16px}
+  .doc-progress{flex-basis:100%;min-width:0}
+  .doc-foot{padding:12px 16px}
+  .doc-foot .btn{width:100%}
+  .lines-chips{padding:0 16px 16px}
+  .verdict{padding:22px 20px;gap:16px}.v-badge{width:56px;height:56px;border-radius:16px}.v-badge .ic{width:28px;height:28px}.v-title{font-size:20px}
+  /* tables become stacked records. Named .rec, not .stack: .stack is the
+     card-list layout utility, and sharing the name turned every table into a
+     grid on desktop. */
+  .tbl.rec thead{display:none}
+  .tbl.rec,.tbl.rec tbody{display:block}
+  .tbl.rec tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 14px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .tbl.rec tbody tr:last-child{border-bottom:0}
+  .tbl.rec td{display:block;padding:0;border:0}
+  .tbl.rec td[data-label]::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:700;letter-spacing:.09em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:2px}
+  .tbl.rec td.full{grid-column:1/-1}
+  .tbl.rec td.act{grid-column:1/-1;text-align:left}
+  .tbl.rec .qty-ctl{display:flex;width:100%}
+  .tbl.rec .qty-ctl .input{flex:1;width:auto}
+  .tbl.rec .act .btn{width:100%}
+  #toasts{top:auto;bottom:calc(84px + env(safe-area-inset-bottom,0px));left:12px;right:12px;width:auto}
+  dialog#modal{width:100%;max-width:100%;margin:auto 0 0}
+  .modal-card{border-radius:22px 22px 0 0;padding-bottom:env(safe-area-inset-bottom,0px);animation-name:sheet}
+  .facts{grid-template-columns:minmax(0,1fr)}
+}
+@keyframes sheet{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+@media (max-width:400px){.kpis{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.k-val{font-size:21px}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+}
 </style>
 </head>
 <body>
 
-<header>
-  <div>
-    <div class="brand">PLIM<span>SOLL</span></div>
-    <div class="sub">Harbourline Logistics — warehouse management</div>
+<!-- Icon sprite. Strokes come from .ic in CSS so every icon follows currentColor. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+  <symbol id="i-overview" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="9" rx="2"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="2"/><rect x="13.5" y="11.5" width="7.5" height="9.5" rx="2"/><rect x="3" y="15.5" width="7.5" height="5.5" rx="2"/></symbol>
+  <symbol id="i-stock" viewBox="0 0 24 24"><path d="M12 2.8 3.6 7.2v9.6L12 21.2l8.4-4.4V7.2L12 2.8Z"/><path d="M3.6 7.2 12 11.8l8.4-4.6M12 11.8v9.4M7.8 5 16.2 9.6"/></symbol>
+  <symbol id="i-inbound" viewBox="0 0 24 24"><path d="M12 3.5v10.5m0 0-4-4m4 4 4-4"/><path d="M4 13.5v4.5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4.5"/></symbol>
+  <symbol id="i-outbound" viewBox="0 0 24 24"><path d="M2.8 6.5h11v9.8h-11z"/><path d="M13.8 9.5h3.7l3.7 3.6v3.2h-7.4"/><circle cx="7" cy="17.6" r="1.9"/><circle cx="17.2" cy="17.6" r="1.9"/></symbol>
+  <symbol id="i-ledger" viewBox="0 0 24 24"><path d="M5 4.5h11.5A2.5 2.5 0 0 1 19 7v12.5H7.5A2.5 2.5 0 0 1 5 17V4.5Z"/><path d="M5 17a2.5 2.5 0 0 1 2.5-2.5H19M9 8.5h6M9 11.5h3.5"/></symbol>
+  <symbol id="i-audit" viewBox="0 0 24 24"><path d="M12 2.8 4.5 5.8v5.7c0 4.7 3.2 8.6 7.5 9.7 4.3-1.1 7.5-5 7.5-9.7V5.8L12 2.8Z"/><path d="m8.8 12.2 2.3 2.3 4.2-4.6"/></symbol>
+  <symbol id="i-audit-bad" viewBox="0 0 24 24"><path d="M12 2.8 4.5 5.8v5.7c0 4.7 3.2 8.6 7.5 9.7 4.3-1.1 7.5-5 7.5-9.7V5.8L12 2.8Z"/><path d="M12 8v4.6M12 15.6v.2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.7-4.4M4 3.8v4h4"/><path d="M4 13a8 8 0 0 0 14.7 4.4M20 20.2v-4h-4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4.2 2.9 17.5A2 2 0 0 0 4.6 20.5h14.8a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9.5v4.5M12 17v.2"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m0 0-5-5m5 5-5 5"/></symbol>
+  <symbol id="i-move" viewBox="0 0 24 24"><path d="M4 8h13m0 0-3.5-3.5M17 8l-3.5 3.5"/><path d="M20 16H7m0 0 3.5-3.5M7 16l3.5 3.5"/></symbol>
+  <symbol id="i-pick" viewBox="0 0 24 24"><path d="M9 4.5h6a1 1 0 0 1 1 1v1H8v-1a1 1 0 0 1 1-1Z"/><path d="M8 6.5H6.5A1.5 1.5 0 0 0 5 8v11.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8a1.5 1.5 0 0 0-1.5-1.5H16"/><path d="m8.8 13.8 2.2 2.2 4.2-4.4"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10.2 13.8"/><path d="M21 3 14.6 21l-4.4-7.2L3 9.4 21 3Z"/></symbol>
+  <symbol id="i-adjust" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.8"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></symbol>
+  <symbol id="i-hazard" viewBox="0 0 24 24"><path d="M12 2.6 21.4 12 12 21.4 2.6 12 12 2.6Z"/><path d="M12 8v4.8M12 15.6v.2"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 4.8-9 4.8-9-4.8L12 3Z"/><path d="m3 12.2 9 4.8 9-4.8M3 16.6l9 4.8 9-4.8"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3.5 13.9 9l5.6 1.9-5.6 1.9L12 18.3l-1.9-5.5-5.6-1.9L10.1 9 12 3.5Z"/></symbol>
+</defs></svg>
+
+<div class="app">
+  <aside class="sidebar" aria-label="Plimsoll navigation">
+    <a class="brand" href="#overview" aria-label="Harbourline Logistics — Plimsoll home">
+      <span class="mark" data-logo></span>
+      <span class="brand-text">
+        <span class="brand-name">Harbourline</span>
+        <span class="brand-prod">Plimsoll WMS</span>
+      </span>
+    </a>
+
+    <nav class="nav" aria-label="Primary">
+      <div class="nav-group">
+        <div class="nav-label">Operations</div>
+        <a class="nav-btn" href="#overview" data-route="overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"></use></svg><span class="lbl">Overview</span></a>
+        <a class="nav-btn" href="#stock" data-route="stock"><svg class="ic" aria-hidden="true"><use href="#i-stock"></use></svg><span class="lbl">Stock</span></a>
+        <a class="nav-btn" href="#inbound" data-route="inbound"><svg class="ic" aria-hidden="true"><use href="#i-inbound"></use></svg><span class="lbl">Inbound</span><span class="count" hidden></span></a>
+        <a class="nav-btn" href="#outbound" data-route="outbound"><svg class="ic" aria-hidden="true"><use href="#i-outbound"></use></svg><span class="lbl">Outbound</span><span class="count" hidden></span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">Control</div>
+        <a class="nav-btn" href="#ledger" data-route="ledger"><svg class="ic" aria-hidden="true"><use href="#i-ledger"></use></svg><span class="lbl">Ledger</span></a>
+        <a class="nav-btn" href="#audit" data-route="audit"><svg class="ic" aria-hidden="true"><use href="#i-audit"></use></svg><span class="lbl">Audit</span><span class="dot" hidden></span></a>
+      </div>
+    </nav>
+
+    <div class="side-foot">
+      <span class="live" id="live">Connecting</span>
+      <div class="sf-row"><span>Core</span><b id="core-host">—</b></div>
+      <div class="sf-row"><span>Environment</span><b id="core-env">—</b></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <a class="m-brand" href="#overview" aria-label="Harbourline home"><span class="mark sm" data-logo></span></a>
+      <div class="page-head">
+        <h1 id="page-title">Overview</h1>
+        <p id="page-sub">Live position of the warehouse</p>
+      </div>
+      <div class="top-actions">
+        <span class="updated" id="updated" aria-live="off">Connecting…</span>
+        <a id="integrity" class="pill-status wait" href="#audit" aria-label="Ledger integrity"><svg class="ic" aria-hidden="true"><use href="#i-audit"></use></svg><span class="txt">Checking ledger</span></a>
+        <button class="icon-btn" type="button" data-action="refresh" aria-label="Refresh data" title="Refresh (R)"><svg class="ic" aria-hidden="true"><use href="#i-refresh"></use></svg></button>
+        <button id="operator" class="operator" type="button" data-action="operator" aria-label="Change operator"></button>
+      </div>
+    </header>
+
+    <main id="view" class="view" tabindex="-1" aria-live="polite" aria-busy="true"></main>
+
+    <footer class="foot">
+      Plimsoll WMS · Harbourline Logistics — Portal proxies Core at <code>/api/</code> and Insight at <code>/reports/</code>.
+      Every movement is written to the ledger against the operator shown above.
+    </footer>
   </div>
-  <div class="spacer"></div>
-  <label class="chip">operator <input id="operator" size="10" value="portal"></label>
-  <span class="chip">core <b id="core-host">—</b></span>
-  <span class="chip">on hand <b id="on-hand">—</b></span>
-  <span id="verdict" class="badge">CHECKING</span>
-</header>
+</div>
 
-<nav id="tabs">
-  <button data-tab="stock"   aria-selected="true">Stock</button>
-  <button data-tab="inbound" aria-selected="false">Inbound</button>
-  <button data-tab="outbound" aria-selected="false">Outbound</button>
-  <button data-tab="ledger"  aria-selected="false">Ledger</button>
-  <button data-tab="audit"   aria-selected="false">Audit</button>
-</nav>
-
-<main>
-  <div id="flash" class="flash"></div>
-  <section id="panel"></section>
-</main>
-
-<footer>
-  Portal proxies Core at <code>/api/</code> and Insight at <code>/reports/</code>.
-  Every movement is written to the ledger with the operator named above.
-</footer>
+<div id="toasts" aria-live="polite" aria-relevant="additions"></div>
+<dialog id="modal" aria-labelledby="modal-title"></dialog>
 
 <script>
-// Plimsoll Portal.
-//
-// No framework and no build step on purpose: this tier is nginx serving one
-// static file, and adding a toolchain would mean a build stage, a lockfile and
-// a supply chain for a page that renders six tables.
-//
-// Everything is same-origin. nginx proxies Core at /api/ and Insight at
-// /reports/, so there is no CORS policy to maintain and no second Ingress to
-// authenticate later.
+"use strict";
+/*
+  Plimsoll Portal behaviour.
 
-const $ = (s) => document.querySelector(s);
-const esc = (v) => String(v ?? "").replace(/[&<>"]/g, c =>
-  ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+  Everything is same-origin: nginx proxies Core at /api/ and Insight at
+  /reports/, so there is no CORS policy and no second Ingress to authenticate.
 
-function flash(msg, good) {
-  const el = $("#flash");
-  el.textContent = msg;
-  el.className = "flash show " + (good ? "good" : "bad");
-  clearTimeout(flash._t);
-  flash._t = setTimeout(() => el.className = "flash", 6000);
+  Three rules run through this file:
+   1. Core's refusal is shown verbatim. A 409 carries the reason - "insufficient
+      stock at source" - and that sentence is more useful than anything this
+      page could invent.
+   2. Nothing moves without a named operator. The actor is written into the
+      ledger in the same transaction as the stock change, so an unnamed portal
+      session would quietly misattribute work. The name is remembered per browser.
+   3. Polling never repaints a view. It updates counts and the integrity badge
+      only, so a refresh can never wipe a quantity someone is typing.
+*/
+
+// ------------------------------------------------------------------ helpers
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ic = (n, c = "") => `<svg class="ic ${c}" aria-hidden="true"><use href="#i-${n}"></use></svg>`;
+const nf = new Intl.NumberFormat("en-AU");
+const fmt = n => nf.format(Number(n) || 0);
+const plural = (n, one, many = one + "s") => `${fmt(n)} ${Number(n) === 1 ? one : many}`;
+const pct = (a, b) => (b > 0 ? Math.max(0, Math.min(100, (a / b) * 100)) : 0);
+
+const ZONES = {
+  RECV: { name: "Receiving",    tone: "info"   },
+  BULK: { name: "Bulk storage", tone: "violet" },
+  PICK: { name: "Pick face",    tone: "teal"   },
+  DISP: { name: "Despatch",     tone: "warn"   },
+};
+const REASONS = {
+  RECEIPT:  { label: "Receipt",  tone: "info",   icon: "inbound" },
+  PUTAWAY:  { label: "Putaway",  tone: "violet", icon: "move"    },
+  PICK:     { label: "Pick",     tone: "teal",   icon: "pick"    },
+  DISPATCH: { label: "Dispatch", tone: "warn",   icon: "send"    },
+  ADJUST:   { label: "Adjust",   tone: "slate",  icon: "adjust"  },
+};
+const ORDER_STATUS = {
+  NEW:        { label: "New",               tone: "slate" },
+  PICKING:    { label: "Picking",           tone: "info"  },
+  PICKED:     { label: "Ready to dispatch", tone: "teal"  },
+  DISPATCHED: { label: "Dispatched",        tone: "ok"    },
+};
+const RECEIPT_STATUS = {
+  EXPECTED: { label: "Expected", tone: "info" },
+  ARRIVED:  { label: "Arrived",  tone: "teal" },
+  CLOSED:   { label: "Closed",   tone: "ok"   },
+};
+const pill = (def, fallback) => `<span class="pill t-${def ? def.tone : "slate"}">${esc(def ? def.label : fallback)}</span>`;
+const zoneTag = z => `<span class="zone t-${(ZONES[z] || {}).tone || "slate"}">${esc((ZONES[z] || {}).name || z)}</span>`;
+const haz = h => h ? `<span class="haz" title="Dangerous goods ${esc(h)}">${ic("hazard")}${esc(h)}</span>` : "";
+
+// Flask serialises datetimes as RFC 1123 ("Fri, 28 Nov 2026 04:22:03 GMT"),
+// not ISO 8601. The previous portal sliced that string as if it were ISO and
+// rendered "Fri, 28 Nov 2026 04". Date() parses both forms correctly.
+const parseDate = v => { if (!v) return null; const d = new Date(v); return isNaN(d) ? null : d; };
+const dtf = new Intl.DateTimeFormat("en-AU", { dateStyle: "medium", timeStyle: "short" });
+const absTime = v => { const d = parseDate(v); return d ? dtf.format(d) : "—"; };
+function relTime(v) {
+  const d = parseDate(v); if (!d) return "—";
+  const s = Math.round((Date.now() - d) / 1000);
+  if (s < 45) return "just now";
+  const m = Math.round(s / 60); if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60); if (h < 24) return `${h} h ago`;
+  const dd = Math.round(h / 24); if (dd < 7) return `${dd} d ago`;
+  return absTime(v);
 }
+const timeTag = v => { const d = parseDate(v);
+  return d ? `<time datetime="${esc(d.toISOString())}" title="${esc(absTime(v))}">${esc(relTime(v))}</time>` : "—"; };
 
-async function get(path) {
-  const r = await fetch(path, { headers: { "Accept": "application/json" } });
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body.error || `${path} returned ${r.status}`);
-  return body;
+function parseActor(a) {
+  a = String(a || "");
+  if (a.startsWith("seed/")) return { who: "Warehouse setup", via: "System", sys: true };
+  const p = a.split("/");
+  if (p[0] === "portal") return { who: p[1] || "anon", via: "Portal" };
+  if (p[0] === "deck")   return { who: p[2] || "anon", via: `Deck · ${p[1] || "?"}` };
+  if (p[0] === "api")    return { who: "Core API", via: p[1] || "", sys: true };
+  return { who: a || "unknown", via: "" };
 }
+const initials = n => {
+  const w = String(n || "?").trim().split(/[\s._-]+/).filter(Boolean);
+  return ((w[0] || "?")[0] + ((w[1] || "")[0] || "")).toUpperCase();
+};
+const whoCell = actor => { const p = parseActor(actor);
+  return `<span class="who"><span class="avatar ${p.sys ? "sys" : ""}">${p.sys ? ic("layers") : esc(initials(p.who))}</span>
+    <span><span>${esc(p.who)}</span><span class="via" style="display:block">${esc(p.via)}</span></span></span>`; };
 
-// Core answers a refused movement with 409 and a body explaining WHY -
-// insufficient stock, over-receipt, order not picked. Showing that text is the
-// difference between an operator who knows what to do next and one who does
-// not. "Request failed" is never shown if Core said something better.
-async function post(path, payload) {
-  const r = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...payload, actor: `portal/${$("#operator").value || "anon"}` }),
-  });
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    const why = body.error || `HTTP ${r.status}`;
-    throw new Error(body.constraint ? `${why} (${body.constraint})` : why);
+// Browser storage is a per-viewer convenience only. It can be unavailable in a
+// private window, so every access is wrapped and the page works without it.
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* not fatal */ } },
+};
+let operator = store.get("plimsoll.operator") || "";
+
+// --------------------------------------------------------------------- api
+class ApiError extends Error {
+  constructor(msg, body, status) { super(msg); this.body = body; this.status = status; }
+}
+function explain(body, status, path) {
+  let m = (body && body.error) || `${path} answered HTTP ${status}`;
+  m = m.charAt(0).toUpperCase() + m.slice(1);
+  const bits = [];
+  if (body) {
+    if (body.available !== undefined)   bits.push(`${fmt(body.available)} available`);
+    if (body.outstanding !== undefined) bits.push(`${fmt(body.outstanding)} outstanding`);
+    if (body.requested !== undefined)   bits.push(`${fmt(body.requested)} requested`);
+    if (status === 409 && typeof body.status === "string" && ORDER_STATUS[body.status])
+      bits.push(`order is ${ORDER_STATUS[body.status].label.toLowerCase()}`);
+    if (body.constraint) bits.push(`constraint ${body.constraint}`);
   }
+  return bits.length ? `${m} — ${bits.join(" · ")}` : m;
+}
+async function request(path, opts = {}) {
+  let r;
+  try {
+    r = await fetch(path, { ...opts, headers: {
+      Accept: "application/json", ...(opts.body ? { "Content-Type": "application/json" } : {}) } });
+  } catch {
+    throw new ApiError("Plimsoll Core is unreachable — check the connection and try again.", null, 0);
+  }
+  const body = await r.json().catch(() => null);
+  if (!r.ok) throw new ApiError(explain(body, r.status, path), body, r.status);
   return body;
 }
+const get = p => request(p);
+const post = (p, payload) => request(p, { method: "POST",
+  body: JSON.stringify({ ...payload, actor: `portal/${operator || "anon"}` }) });
 
-const rows = (arr, cells) => arr.map(cells).join("") ||
-  `<tr><td class="muted" colspan="9">nothing to show</td></tr>`;
+// Reference data changes rarely, so it is fetched once and dropped on refresh.
+const cache = {};
+const cached = (k, p) => (cache[k] ||= get(p).catch(e => { delete cache[k]; throw e; }));
+const skuMap = async () => Object.fromEntries((await cached("skus", "/api/skus")).map(s => [s.sku, s]));
+const locList = () => cached("locations", "/api/locations");
 
-// ------------------------------------------------------------------ panels
+// ----------------------------------------------------------------- feedback
+function toast(type, title, msg) {
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.setAttribute("role", type === "error" ? "alert" : "status");
+  el.innerHTML = `<div class="t-ico">${ic(type === "error" ? "alert" : "check")}</div>
+    <div><div class="t-title">${esc(title)}</div>${msg ? `<div class="t-msg">${esc(msg)}</div>` : ""}</div>
+    <button class="x" type="button" aria-label="Dismiss">${ic("x")}</button>`;
+  const close = () => { el.classList.add("out"); setTimeout(() => el.remove(), 200); };
+  el.querySelector(".x").addEventListener("click", close);
+  // Newest nearest the corner, where the eye already is. At most three at
+  // once: receive, move and pick in quick succession otherwise builds a wall
+  // of notices over the page.
+  const box = $("#toasts"); box.append(el);
+  [...box.children].slice(0, -3).forEach(t => t.remove());
+  setTimeout(close, type === "error" ? 9000 : 5500);
+}
+function busy(btn, on) { if (!btn) return; btn.disabled = on; btn.classList.toggle("is-busy", on); }
 
-const panels = {
-  async stock() {
-    const [s, byZone] = await Promise.all([get("/api/stock"), get("/reports/stock")]);
-    const zones = Object.entries(byZone.by_zone || {});
-    return `
-      <div class="cards">
-        ${zones.map(([z, q]) => `
-          <div class="card"><div class="n">${q}</div><div class="l">${esc(z)}</div></div>`).join("")}
-        <div class="card"><div class="n">${s.on_hand}</div><div class="l">on hand</div></div>
-      </div>
-      <h2>Stock by location</h2>
-      <div class="wrap"><table>
-        <tr><th>SKU</th><th>Location</th><th>Zone</th><th class="num">Qty</th><th></th></tr>
-        ${rows(s.lines, r => `<tr>
-          <td>${esc(r.sku)}</td><td>${esc(r.location)}</td>
-          <td><span class="z">${esc(r.zone)}</span></td>
-          <td class="num">${r.qty}</td>
-          <td><button class="act ghost" data-move="${esc(r.sku)}|${esc(r.location)}">Move</button></td>
-        </tr>`)}
-      </table></div>`;
-  },
+// One dialog element, filled per use. Native <dialog> gives a real focus trap,
+// Escape to close and an inert background without a library.
+function modal({ title, sub, icon = "sparkle", tone = "teal", body, confirm = "Confirm", confirmClass = "btn-primary", onSubmit }) {
+  const dlg = $("#modal");
+  dlg.innerHTML = `<form method="dialog" class="modal-card" novalidate>
+      <header>
+        <div class="m-ico t-${tone}">${ic(icon)}</div>
+        <div><h2 id="modal-title">${esc(title)}</h2>${sub ? `<p>${esc(sub)}</p>` : ""}</div>
+      </header>
+      <div class="modal-body">${body}<div class="callout bad modal-error" role="alert" hidden></div></div>
+      <footer>
+        <button type="submit" value="cancel" class="btn btn-ghost" formnovalidate>Cancel</button>
+        <button type="submit" value="ok" class="btn ${confirmClass}" id="modal-ok">${esc(confirm)}</button>
+      </footer>
+    </form>`;
+  return new Promise(resolve => {
+    const form = dlg.querySelector("form");
+    const err = dlg.querySelector(".modal-error");
+    form.addEventListener("submit", async e => {
+      if (!e.submitter || e.submitter.value !== "ok") return;     // Cancel closes the dialog
+      e.preventDefault();
+      if (!form.reportValidity()) return;
+      const ok = $("#modal-ok"); busy(ok, true); err.hidden = true;
+      try {
+        const result = await onSubmit(Object.fromEntries(new FormData(form)));
+        dlg.close(); resolve(result);
+      } catch (ex) {
+        err.innerHTML = `${ic("alert")}<span>${esc(ex.message)}</span>`; err.hidden = false; busy(ok, false);
+      }
+    });
+    dlg.addEventListener("close", () => resolve(null), { once: true });
+    dlg.showModal();
+    const first = dlg.querySelector("select, input:not([type=hidden])");
+    if (first) { first.focus(); if (first.select) first.select(); }
+  });
+}
 
-  async inbound() {
-    const receipts = await get("/api/receipts");
-    const detail = await Promise.all(receipts.map(r => get(`/api/receipts/${r.id}`)));
-    return `
-      <h2>Inbound loads</h2>
-      ${detail.map(r => `
-        <div style="margin-bottom:18px">
-          <div class="cards" style="margin-bottom:8px">
-            <div class="card">
-              <div class="n">${esc(r.id)}</div>
-              <div class="l">${esc(r.carrier)} — ${esc(r.status)}</div>
-            </div>
+// ----------------------------------------------------------------- operator
+function renderOperator() {
+  const b = $("#operator");
+  b.classList.toggle("unset", !operator);
+  b.innerHTML = operator
+    ? `<span class="avatar">${esc(initials(operator))}</span><span class="meta"><span class="who">${esc(operator)}</span><span class="role">Operator</span></span>`
+    : `<span class="avatar unset">${ic("user")}</span><span class="meta"><span class="who">Set operator</span><span class="role">Needed to move stock</span></span>`;
+  b.title = operator ? `Movements are recorded as portal/${operator}` : "Set who is operating this portal";
+}
+async function editOperator(required) {
+  const name = await modal({
+    title: required ? "Who's operating?" : "Operator",
+    sub: "Every movement is written to the ledger against this name.",
+    icon: "user",
+    body: `<label class="field"><span>Operator name</span>
+        <input class="input" name="name" required maxlength="32" pattern="[A-Za-z0-9 ._\\-]+" autocomplete="name"
+               placeholder="e.g. Ramsin" value="${esc(operator)}">
+        <small>Recorded as <code>portal/&lt;name&gt;</code>. Remembered on this device.</small></label>`,
+    confirm: "Save operator",
+    onSubmit: async fd => {
+      const n = String(fd.name || "").trim();
+      if (!n) throw new Error("Enter a name so movements can be attributed.");
+      operator = n; store.set("plimsoll.operator", n); renderOperator(); return n;
+    },
+  });
+  if (name) toast("success", `Operating as ${name}`, `Movements will be recorded as portal/${name}.`);
+  return name;
+}
+const ensureOperator = async () => !!operator || !!(await editOperator(true));
+
+// -------------------------------------------------------------------- views
+const ui = { stockZone: "ALL", stockQuery: "", hideEmpty: true, ledgerReason: "ALL", ledgerQuery: "", outTab: "open" };
+
+const emptyState = (icon, tone, title, text, action = "") =>
+  `<div class="empty"><div class="e-ico t-${tone}">${ic(icon)}</div><h3>${esc(title)}</h3><p>${esc(text)}</p>${action}</div>`;
+
+const PLIMSOLL_MARK = `<svg class="wm" viewBox="0 0 200 200" fill="none" stroke="#fff" aria-hidden="true">
+  <circle cx="100" cy="100" r="70" stroke-width="10"/><path d="M14 100h172" stroke-width="10" stroke-linecap="round"/></svg>`;
+
+function greeting() {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
+const views = {
+  // --------------------------------------------------------------- overview
+  overview: {
+    title: "Overview", sub: "Live position of the warehouse",
+    async load() {
+      const [stock, orders, receipts, moves, rec, locs] = await Promise.all([
+        get("/api/stock"), get("/api/orders"), get("/api/receipts"),
+        get("/api/movements?limit=8"), get("/reports/reconciliation"), locList()]);
+      return { stock, orders, receipts, moves, rec, locs, skus: await skuMap() };
+    },
+    paint(d) {
+      const open = d.orders.filter(o => o.status !== "DISPATCHED");
+      const toPick = open.reduce((n, o) => n + Math.max(0, o.ordered - o.picked), 0);
+      const ready = open.filter(o => o.status === "PICKED").length;
+      const due = d.receipts.filter(r => r.expected > r.received);
+      const dueUnits = due.reduce((n, r) => n + (r.expected - r.received), 0);
+      const lines = d.stock.lines.filter(l => l.qty > 0);
+      const skuCount = new Set(lines.map(l => l.sku)).size;
+
+      const capBy = {}, qtyBy = {}, locsBy = {};
+      d.locs.forEach(l => { capBy[l.zone] = (capBy[l.zone] || 0) + l.capacity; locsBy[l.zone] = (locsBy[l.zone] || 0) + 1; });
+      d.stock.lines.forEach(l => { qtyBy[l.zone] = (qtyBy[l.zone] || 0) + l.qty; });
+      const capOf = Object.fromEntries(d.locs.map(l => [l.code, l.capacity]));
+
+      // The work queue: what needs a human next, in the order it matters.
+      const queue = [];
+      if (!d.rec.balanced) queue.push({ href: "#audit", icon: "audit-bad", tone: "bad",
+        title: `${plural(d.rec.discrepancy_count, "stock discrepancy", "stock discrepancies")}`,
+        meta: "Stock changed without a ledger movement — count these locations" });
+      d.orders.filter(o => o.status === "PICKED").forEach(o => queue.push({ href: "#outbound", icon: "send", tone: "warn",
+        title: `Dispatch ${o.id}`, meta: `${o.customer} · fully picked, ready to ship` }));
+      open.filter(o => o.status !== "PICKED").forEach(o => queue.push({ href: "#outbound", icon: "pick", tone: "teal",
+        title: `Pick ${o.id}`, meta: `${o.customer} · ${plural(o.ordered - o.picked, "unit")} to pick` }));
+      due.forEach(r => queue.push({ href: "#inbound", icon: "inbound", tone: "info",
+        title: `Receive ${r.id}`, meta: `${r.carrier} · ${plural(r.expected - r.received, "unit")} outstanding` }));
+      d.stock.lines.filter(l => l.zone === "PICK" && l.qty <= 0.1 * (capOf[l.location] || 0)).forEach(l =>
+        queue.push({ href: "#stock", icon: "layers", tone: "violet",
+          title: `Replenish ${l.location}`, meta: `${l.sku} · ${l.qty ? `only ${fmt(l.qty)} left` : "empty"} on the pick face` }));
+
+      const sentence = queue.length
+        ? `${plural(queue.length, "task needs", "tasks need")} attention across receiving, picking and despatch.`
+        : "Everything is up to date. No loads waiting, no orders to pick.";
+      const first = queue[0];
+
+      const zoneRows = Object.keys(ZONES).map(z => {
+        const q = qtyBy[z] || 0, c = capBy[z] || 0, p = pct(q, c), Z = ZONES[z];
+        return `<div class="zone-row">
+          <div><div class="zr-name"><i style="background:var(--${Z.tone === "teal" ? "brand-teal" : Z.tone})"></i>${esc(Z.name)}</div>
+               <div class="zr-sub">${plural(locsBy[z] || 0, "location")}</div></div>
+          <div class="progress lg bar-${Z.tone}" role="progressbar" aria-label="${esc(Z.name)} utilisation" aria-valuenow="${Math.round(p)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${p}%"></span></div>
+          <div class="zr-val"><b>${fmt(q)}</b> / ${fmt(c)}<span>${Math.round(p)}% of capacity</span></div>
+        </div>`;
+      }).join("");
+
+      const feed = d.moves.map(m => {
+        const R = REASONS[m.reason] || { label: m.reason, tone: "slate", icon: "adjust" };
+        const a = parseActor(m.actor);
+        const s = `<b>${fmt(m.qty)}</b> × <span class="mono">${esc(m.sku)}</span>`;
+        const text = {
+          RECEIPT:  `Received ${s} into <span class="mono">${esc(m.to_location)}</span>`,
+          PUTAWAY:  `Moved ${s} <span class="mono">${esc(m.from_location)}</span> → <span class="mono">${esc(m.to_location)}</span>`,
+          PICK:     `Picked ${s} from <span class="mono">${esc(m.from_location)}</span>`,
+          DISPATCH: `Dispatched ${s}`,
+          ADJUST:   `${a.sys ? "Opening count" : "Adjusted"} ${s} at <span class="mono">${esc(m.to_location || m.from_location)}</span>`,
+        }[m.reason] || `${esc(m.reason)} ${s}`;
+        return `<li><div class="f-ico t-${R.tone}">${ic(R.icon)}</div>
+          <div><div class="f-text">${text}</div><div class="f-meta">${esc(a.who)}${a.via ? ` · ${esc(a.via)}` : ""}</div></div>
+          <div class="f-time">${timeTag(m.occurred_at)}</div></li>`;
+      }).join("");
+
+      return `
+        <section class="hero" aria-label="Summary">
+          ${PLIMSOLL_MARK}
+          <div class="eyebrow">${esc(new Intl.DateTimeFormat("en-AU", { weekday: "long", day: "numeric", month: "long" }).format(new Date()))}</div>
+          <h2>${esc(greeting())}${operator ? `, ${esc(operator)}` : ""}.</h2>
+          <p>${esc(sentence)}</p>
+          <div class="hero-actions">
+            ${first ? `<a class="btn btn-light" href="${first.href}">${ic(first.icon)}${esc(first.title)}</a>` : ""}
+            <a class="btn btn-glass" href="#stock">${ic("stock")}View stock</a>
           </div>
-          <div class="wrap"><table>
-            <tr><th>Line</th><th>SKU</th><th class="num">Expected</th>
-                <th class="num">Received</th><th>Receive</th></tr>
-            ${rows(r.lines, l => {
-              const left = l.qty_expected - l.qty_received;
-              return `<tr>
-                <td>${l.line_no}</td><td>${esc(l.sku)}</td>
-                <td class="num">${l.qty_expected}</td>
-                <td class="num">${l.qty_received}</td>
-                <td>
-                  <input size="4" value="${left}" id="rq-${esc(r.id)}-${l.line_no}" ${left ? "" : "disabled"}>
-                  <button class="act" data-receive="${esc(r.id)}|${l.line_no}" ${left ? "" : "disabled"}>Receive</button>
-                </td></tr>`;
-            })}
-          </table></div>
-        </div>`).join("") || `<p class="muted">No inbound loads.</p>`}`;
-  },
+        </section>
 
-  async outbound() {
-    const orders = await get("/api/orders");
-    const detail = await Promise.all(orders.map(o => get(`/api/orders/${o.id}`)));
-    return `
-      <h2>Orders</h2>
-      ${detail.map(o => `
-        <div style="margin-bottom:18px">
-          <div class="cards" style="margin-bottom:8px">
-            <div class="card">
-              <div class="n">${esc(o.id)}</div>
-              <div class="l">${esc(o.customer)} — ${esc(o.status)}</div>
-            </div>
-            <div class="card" style="display:flex;align-items:center">
-              <button class="act" data-dispatch="${esc(o.id)}"
-                ${o.status === "PICKED" ? "" : "disabled"}>Dispatch</button>
-            </div>
-          </div>
-          <div class="wrap"><table>
-            <tr><th>Line</th><th>SKU</th><th class="num">Ordered</th>
-                <th class="num">Picked</th><th>Pick</th></tr>
-            ${rows(o.lines, l => {
-              const left = l.qty - l.qty_picked;
-              return `<tr>
-                <td>${l.line_no}</td><td>${esc(l.sku)}</td>
-                <td class="num">${l.qty}</td><td class="num">${l.qty_picked}</td>
-                <td>
-                  <input size="4" value="${left}" id="pq-${esc(o.id)}-${l.line_no}" ${left ? "" : "disabled"}>
-                  <button class="act" data-pick="${esc(o.id)}|${l.line_no}" ${left ? "" : "disabled"}>Pick</button>
-                </td></tr>`;
-            })}
-          </table></div>
-        </div>`).join("") || `<p class="muted">No orders.</p>`}`;
-  },
-
-  async ledger() {
-    const m = await get("/api/movements?limit=100");
-    return `
-      <h2>Movement ledger — append only</h2>
-      <div class="wrap"><table>
-        <tr><th>#</th><th>When</th><th>SKU</th><th>From</th><th>To</th>
-            <th class="num">Qty</th><th>Reason</th><th>Actor</th></tr>
-        ${rows(m, r => `<tr>
-          <td>${r.id}</td>
-          <td class="muted">${esc(String(r.occurred_at).replace("T", " ").slice(0, 19))}</td>
-          <td>${esc(r.sku)}</td>
-          <td>${esc(r.from_location) || '<span class="muted">—</span>'}</td>
-          <td>${esc(r.to_location) || '<span class="muted">—</span>'}</td>
-          <td class="num">${r.qty}</td>
-          <td><span class="z">${esc(r.reason)}</span></td>
-          <td class="muted">${esc(r.actor)}</td>
-        </tr>`)}
-      </table></div>`;
-  },
-
-  async audit() {
-    const [rec, open] = await Promise.all([
-      get("/reports/reconciliation"), get("/reports/open-orders")]);
-    return `
-      <h2>Ledger vs balance</h2>
-      <div class="cards">
-        <div class="card">
-          <div class="n" style="color:${rec.balanced ? "var(--good)" : "var(--bad)"}">
-            ${esc(rec.verdict)}</div>
-          <div class="l">${rec.discrepancy_count} discrepancies</div>
+        <div class="kpis">
+          <a class="card kpi" href="#stock">
+            <div class="k-top">On hand<span class="k-ico t-teal">${ic("stock")}</span></div>
+            <div class="k-val">${fmt(d.stock.on_hand)}<small>units</small></div>
+            <div class="k-foot">${plural(skuCount, "SKU")} across ${plural(lines.length, "location")}</div>
+          </a>
+          <a class="card kpi" href="#outbound">
+            <div class="k-top">Open orders<span class="k-ico t-warn">${ic("outbound")}</span></div>
+            <div class="k-val">${fmt(open.length)}</div>
+            <div class="k-foot">${open.length ? `${plural(toPick, "unit")} to pick${ready ? ` · ${fmt(ready)} ready to ship` : ""}` : "No orders waiting"}</div>
+          </a>
+          <a class="card kpi" href="#inbound">
+            <div class="k-top">Inbound due<span class="k-ico t-info">${ic("inbound")}</span></div>
+            <div class="k-val">${fmt(dueUnits)}<small>units</small></div>
+            <div class="k-foot">${due.length ? `${plural(due.length, "load")} awaiting receipt` : "No loads due"}</div>
+          </a>
+          <a class="card kpi ${d.rec.balanced ? "ok" : "bad"}" href="#audit">
+            <div class="k-top">Ledger integrity<span class="k-ico ${d.rec.balanced ? "t-ok" : "t-bad"}">${ic(d.rec.balanced ? "audit" : "audit-bad")}</span></div>
+            <div class="k-val">${d.rec.balanced ? "In balance" : fmt(d.rec.discrepancy_count)}</div>
+            <div class="k-foot">${d.rec.balanced ? "Stock matches the movement ledger" : "discrepancies between ledger and stock"}</div>
+          </a>
         </div>
-      </div>
-      <p class="muted" style="max-width:62ch">
-        Stock is re-derived from the movement ledger and compared to the balance
-        table. They must agree: every change writes both inside one transaction.
-        A difference means something wrote to stock without a movement.
-      </p>
-      ${rec.discrepancies.length ? `<div class="wrap"><table>
-        <tr><th>SKU</th><th>Location</th><th class="num">Balance</th>
-            <th class="num">Ledger</th><th class="num">Diff</th></tr>
-        ${rows(rec.discrepancies, d => `<tr>
-          <td>${esc(d.sku)}</td><td>${esc(d.location)}</td>
-          <td class="num">${d.balance}</td><td class="num">${d.ledger}</td>
-          <td class="num" style="color:var(--bad)">${d.difference}</td></tr>`)}
-      </table></div>` : ""}
-      <h2 style="margin-top:24px">Open orders</h2>
-      <div class="wrap"><table>
-        <tr><th>Order</th><th>Customer</th><th>Status</th>
-            <th class="num">Ordered</th><th class="num">Picked</th><th class="num">Fill</th></tr>
-        ${rows(open.open_orders, o => `<tr>
-          <td>${esc(o.id)}</td><td>${esc(o.customer)}</td>
-          <td><span class="z">${esc(o.status)}</span></td>
-          <td class="num">${o.ordered}</td><td class="num">${o.picked}</td>
-          <td class="num">${Math.round(o.fill_rate * 100)}%</td></tr>`)}
-      </table></div>`;
+
+        <div class="two-col">
+          <section class="card">
+            <div class="card-head"><div><h2>Zone utilisation</h2><div class="sub">Units held against location capacity</div></div>
+              <a class="link" href="#stock">Stock ${ic("chevron")}</a></div>
+            <div class="zones">${zoneRows}</div>
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h2>Work queue</h2><div class="sub">What needs a person next</div></div></div>
+            ${queue.length
+              ? `<ul class="queue">${queue.slice(0, 6).map(q => `<li><a class="q-item" href="${q.href}">
+                   <span class="q-ico t-${q.tone}">${ic(q.icon)}</span>
+                   <span><span class="q-title" style="display:block">${esc(q.title)}</span><span class="q-meta">${esc(q.meta)}</span></span>
+                   <span class="q-go">${ic("chevron")}</span></a></li>`).join("")}</ul>`
+              : emptyState("check", "ok", "All caught up", "No loads to receive, no orders to pick, and the ledger balances.")}
+          </section>
+        </div>
+
+        <section class="card">
+          <div class="card-head"><div><h2>Recent activity</h2><div class="sub">The latest movements written to the ledger</div></div>
+            <a class="link" href="#ledger">Full ledger ${ic("chevron")}</a></div>
+          ${feed ? `<ul class="feed">${feed}</ul>` : emptyState("ledger", "slate", "No movements yet", "Receive, move, pick or dispatch stock and it will appear here.")}
+        </section>`;
+    },
+  },
+
+  // ------------------------------------------------------------------ stock
+  stock: {
+    title: "Stock", sub: "On-hand inventory by location",
+    async load() {
+      const [stock, skus] = await Promise.all([get("/api/stock"), skuMap()]);
+      return { stock, skus };
+    },
+    paint(d) {
+      const tot = { ALL: 0 }; d.stock.lines.forEach(l => { tot[l.zone] = (tot[l.zone] || 0) + l.qty; tot.ALL += l.qty; });
+      const chip = (z, label) => `<button type="button" class="chip" data-zone="${z}" aria-pressed="${ui.stockZone === z}">${esc(label)} <span class="n">${fmt(tot[z] || 0)}</span></button>`;
+      return `<section class="card">
+        <div class="toolbar">
+          <div class="search">${ic("search")}
+            <input class="input" id="stock-q" type="search" placeholder="Search SKU, description or location"
+                   value="${esc(ui.stockQuery)}" aria-label="Search stock" autocomplete="off"><kbd>/</kbd></div>
+          <div class="chips" role="group" aria-label="Filter by zone">
+            ${chip("ALL", "All zones")}${Object.keys(ZONES).map(z => chip(z, ZONES[z].name)).join("")}
+          </div>
+          <label class="switch"><input type="checkbox" id="stock-empty" ${ui.hideEmpty ? "checked" : ""}><span class="track"></span>Hide empty</label>
+        </div>
+        <div id="rows">${this.rows(d)}</div>
+      </section>`;
+    },
+    rows(d) {
+      const q = ui.stockQuery.trim().toLowerCase();
+      const all = d.stock.lines;
+      const rows = all.filter(l =>
+        (ui.stockZone === "ALL" || l.zone === ui.stockZone) &&
+        (!ui.hideEmpty || l.qty > 0) &&
+        (!q || [l.sku, l.location, (d.skus[l.sku] || {}).description].join(" ").toLowerCase().includes(q)));
+      if (!rows.length) return emptyState("search", "slate", "No stock matches",
+        all.length ? "Try a different search, another zone, or show empty locations." : "Nothing is on hand yet. Receive a load to get started.");
+      const units = rows.reduce((n, l) => n + l.qty, 0);
+      return `<div class="tbl-wrap"><table class="tbl rec">
+        <thead><tr><th>Item</th><th>Location</th><th>Zone</th><th class="num">On hand</th><th class="act"><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody>${rows.map(l => { const s = d.skus[l.sku] || {};
+          return `<tr class="${l.qty ? "" : "is-empty"}">
+            <td class="full" data-label="Item"><div class="sku">${esc(l.sku)}${haz(s.hazard_class)}</div><div class="desc">${esc(s.description || "")}</div></td>
+            <td data-label="Location"><span class="loc">${esc(l.location)}</span></td>
+            <td data-label="Zone">${zoneTag(l.zone)}</td>
+            <td class="num" data-label="On hand"><span class="qty">${fmt(l.qty)}</span><span class="uom">${esc(s.uom || "")}</span></td>
+            <td class="act"><button type="button" class="btn btn-secondary btn-sm" data-action="move"
+                data-sku="${esc(l.sku)}" data-loc="${esc(l.location)}" data-qty="${l.qty}" ${l.qty ? "" : "disabled"}>${ic("move")}Move</button></td>
+          </tr>`; }).join("")}</tbody></table></div>
+        <div class="tbl-foot"><span>Showing <b>${fmt(rows.length)}</b> of ${plural(all.length, "stock line")}</span><span><b>${fmt(units)}</b> units</span></div>`;
+    },
+  },
+
+  // ---------------------------------------------------------------- inbound
+  inbound: {
+    title: "Inbound", sub: "Receive goods against expected loads",
+    async load() {
+      const [list, skus] = await Promise.all([get("/api/receipts"), skuMap()]);
+      const details = await Promise.all(list.map(r => get(`/api/receipts/${encodeURIComponent(r.id)}`)));
+      return { list, details, skus };
+    },
+    paint(d) {
+      if (!d.details.length) return `<section class="card">${emptyState("inbound", "info", "No inbound loads",
+        "When a carrier books a delivery it appears here, ready to receive line by line.")}</section>`;
+      return `<div class="stack">${d.details.map(r => {
+        const exp = r.lines.reduce((n, l) => n + l.qty_expected, 0);
+        const got = r.lines.reduce((n, l) => n + l.qty_received, 0);
+        const p = pct(got, exp);
+        return `<article class="card">
+          <div class="doc-head">
+            <div class="doc-id"><div class="doc-ico t-info">${ic("inbound")}</div>
+              <div><div class="doc-title"><span class="id">${esc(r.id)}</span>${pill(RECEIPT_STATUS[r.status], r.status)}</div>
+              <div class="doc-meta">${esc(r.carrier)} · ${r.arrived_at ? `arrived ${timeTag(r.arrived_at)}` : "not yet arrived"}</div></div></div>
+            <div class="doc-progress"><div class="dp-top"><span>Received</span><b>${fmt(got)} / ${fmt(exp)}</b></div>
+              <div class="progress ${p >= 100 ? "bar-ok" : ""}" role="progressbar" aria-label="${esc(r.id)} received" aria-valuenow="${Math.round(p)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${p}%"></span></div></div>
+          </div>
+          <div class="tbl-wrap"><table class="tbl rec">
+            <thead><tr><th>Line</th><th>Item</th><th class="num">Expected</th><th class="num">Received</th><th class="act">Receive</th></tr></thead>
+            <tbody>${r.lines.map(l => { const s = d.skus[l.sku] || {}; const left = l.qty_expected - l.qty_received;
+              return `<tr>
+                <td data-label="Line"><span class="loc">#${l.line_no}</span></td>
+                <td class="full" data-label="Item"><div class="sku">${esc(l.sku)}${haz(s.hazard_class)}</div><div class="desc">${esc(s.description || "")}</div></td>
+                <td class="num" data-label="Expected">${fmt(l.qty_expected)}</td>
+                <td class="num" data-label="Received"><span class="qty">${fmt(l.qty_received)}</span></td>
+                <td class="act">${left > 0
+                  ? `<span class="qty-ctl"><input class="input" type="number" inputmode="numeric" min="1" max="${left}" value="${left}" aria-label="Quantity to receive on line ${l.line_no}">
+                     <button type="button" class="btn btn-primary btn-sm" data-action="receive" data-id="${esc(r.id)}" data-line="${l.line_no}" data-max="${left}">${ic("check")}Receive</button></span>`
+                  : `<span class="done">${ic("check")}Fully received</span>`}</td>
+              </tr>`; }).join("")}</tbody></table></div>
+          ${got > 0 ? `<div class="doc-foot"><span class="hint">${ic("move")}Received stock lands in <span class="loc">RECV-01</span> — put it away from the Stock view.</span>
+            <a class="btn btn-secondary btn-sm" href="#stock">${ic("stock")}Go to stock</a></div>` : ""}
+        </article>`; }).join("")}</div>`;
+    },
+  },
+
+  // --------------------------------------------------------------- outbound
+  outbound: {
+    title: "Outbound", sub: "Pick and dispatch customer orders",
+    async load() {
+      const [list, skus] = await Promise.all([get("/api/orders"), skuMap()]);
+      const details = await Promise.all(list.map(o => get(`/api/orders/${encodeURIComponent(o.id)}`)));
+      return { list, details, skus };
+    },
+    paint(d) {
+      const open = d.details.filter(o => o.status !== "DISPATCHED");
+      const shipped = d.details.filter(o => o.status === "DISPATCHED");
+      const tab = (k, label, n) => `<button type="button" role="tab" data-outtab="${k}" aria-selected="${ui.outTab === k}">${label}<span class="n">${fmt(n)}</span></button>`;
+      const list = ui.outTab === "open" ? open : shipped;
+      const body = list.length
+        ? `<div class="stack">${list.map(o => ui.outTab === "open" ? this.openCard(o, d.skus) : this.shippedCard(o, d.skus)).join("")}</div>`
+        : `<section class="card">${ui.outTab === "open"
+            ? emptyState("check", "ok", "No open orders", "Every order has been picked and dispatched.")
+            : emptyState("outbound", "slate", "Nothing shipped yet", "Dispatched orders appear here with their shipment reference.")}</section>`;
+      return `<div style="margin-bottom:16px"><div class="seg" role="tablist" aria-label="Order status">${tab("open", "Open", open.length)}${tab("shipped", "Shipped", shipped.length)}</div></div>${body}`;
+    },
+    openCard(o, skus) {
+      const ord = o.lines.reduce((n, l) => n + l.qty, 0), pk = o.lines.reduce((n, l) => n + l.qty_picked, 0), p = pct(pk, ord);
+      const ready = o.status === "PICKED";
+      return `<article class="card">
+        <div class="doc-head">
+          <div class="doc-id"><div class="doc-ico t-warn">${ic("outbound")}</div>
+            <div><div class="doc-title"><span class="id">${esc(o.id)}</span>${pill(ORDER_STATUS[o.status], o.status)}</div>
+            <div class="doc-meta">${esc(o.customer)} · created ${timeTag(o.created_at)}</div></div></div>
+          <div class="doc-progress"><div class="dp-top"><span>Picked</span><b>${fmt(pk)} / ${fmt(ord)}</b></div>
+            <div class="progress ${ready ? "bar-ok" : ""}" role="progressbar" aria-label="${esc(o.id)} picked" aria-valuenow="${Math.round(p)}" aria-valuemin="0" aria-valuemax="100"><span style="width:${p}%"></span></div></div>
+        </div>
+        <div class="tbl-wrap"><table class="tbl rec">
+          <thead><tr><th>Line</th><th>Item</th><th class="num">Ordered</th><th class="num">Picked</th><th class="act">Pick</th></tr></thead>
+          <tbody>${o.lines.map(l => { const s = skus[l.sku] || {}; const left = l.qty - l.qty_picked;
+            return `<tr>
+              <td data-label="Line"><span class="loc">#${l.line_no}</span></td>
+              <td class="full" data-label="Item"><div class="sku">${esc(l.sku)}${haz(s.hazard_class)}</div><div class="desc">${esc(s.description || "")}</div></td>
+              <td class="num" data-label="Ordered">${fmt(l.qty)}</td>
+              <td class="num" data-label="Picked"><span class="qty">${fmt(l.qty_picked)}</span></td>
+              <td class="act">${left > 0
+                ? `<span class="qty-ctl"><input class="input" type="number" inputmode="numeric" min="1" max="${left}" value="${left}" aria-label="Quantity to pick on line ${l.line_no}">
+                   <button type="button" class="btn btn-primary btn-sm" data-action="pick" data-id="${esc(o.id)}" data-line="${l.line_no}" data-max="${left}">${ic("pick")}Pick</button></span>`
+                : `<span class="done">${ic("check")}Picked</span>`}</td>
+            </tr>`; }).join("")}</tbody></table></div>
+        <div class="doc-foot">
+          <span class="hint">${ready ? `${ic("check")}All lines picked — stock is waiting in the despatch lane.`
+                                     : `${ic("clock")}Pick every line to enable dispatch. The pick face is used before bulk.`}</span>
+          <button type="button" class="btn ${ready ? "btn-warn" : "btn-secondary"}" data-action="dispatch" data-id="${esc(o.id)}" ${ready ? "" : "disabled"}>${ic("send")}Dispatch order</button>
+        </div>
+      </article>`;
+    },
+    shippedCard(o, skus) {
+      const units = o.lines.reduce((n, l) => n + l.qty_picked, 0);
+      return `<article class="card shipped">
+        <div class="doc-head">
+          <div class="doc-id"><div class="doc-ico t-ok">${ic("send")}</div>
+            <div><div class="doc-title"><span class="id">${esc(o.id)}</span>${pill(ORDER_STATUS[o.status], o.status)}</div>
+            <div class="doc-meta">${esc(o.customer)} · shipment <span class="loc">SHP-${esc(String(o.id).split("-").pop())}</span> · ${plural(units, "unit")}</div></div></div>
+        </div>
+        <div class="lines-chips">${o.lines.map(l => `<span class="lchip"><b>${fmt(l.qty_picked)}</b>× ${esc(l.sku)}</span>`).join("")}</div>
+      </article>`;
+    },
+  },
+
+  // ----------------------------------------------------------------- ledger
+  ledger: {
+    title: "Ledger", sub: "Every stock movement, append-only",
+    async load() {
+      const [moves, skus] = await Promise.all([get("/api/movements?limit=200"), skuMap()]);
+      return { moves, skus };
+    },
+    paint(d) {
+      const n = { ALL: d.moves.length }; d.moves.forEach(m => { n[m.reason] = (n[m.reason] || 0) + 1; });
+      const chip = (r, label) => `<button type="button" class="chip" data-reason="${r}" aria-pressed="${ui.ledgerReason === r}">${esc(label)} <span class="n">${fmt(n[r] || 0)}</span></button>`;
+      return `<section class="card">
+        <div class="toolbar">
+          <div class="search">${ic("search")}
+            <input class="input" id="ledger-q" type="search" placeholder="Search SKU, location or operator"
+                   value="${esc(ui.ledgerQuery)}" aria-label="Search the ledger" autocomplete="off"><kbd>/</kbd></div>
+          <div class="chips" role="group" aria-label="Filter by movement type">
+            ${chip("ALL", "All")}${Object.keys(REASONS).map(r => chip(r, REASONS[r].label)).join("")}
+          </div>
+        </div>
+        <div id="rows">${this.rows(d)}</div>
+      </section>`;
+    },
+    rows(d) {
+      const q = ui.ledgerQuery.trim().toLowerCase();
+      const rows = d.moves.filter(m =>
+        (ui.ledgerReason === "ALL" || m.reason === ui.ledgerReason) &&
+        (!q || [m.sku, m.from_location, m.to_location, parseActor(m.actor).who, m.actor].join(" ").toLowerCase().includes(q)));
+      if (!rows.length) return emptyState("ledger", "slate", "No movements match",
+        d.moves.length ? "Try another movement type or a different search." : "Nothing has moved yet.");
+      const end = (loc, word) => loc ? `<span>${esc(loc)}</span>` : `<span class="ext">${word}</span>`;
+      return `<div class="tbl-wrap"><table class="tbl rec">
+        <thead><tr><th>When</th><th>Movement</th><th>Item</th><th>Route</th><th class="num">Qty</th><th>By</th></tr></thead>
+        <tbody>${rows.map(m => { const R = REASONS[m.reason]; const s = d.skus[m.sku] || {};
+          const sign = !m.from_location ? "plus" : !m.to_location ? "minus" : "";
+          return `<tr>
+            <td data-label="When">${timeTag(m.occurred_at)}<div class="desc">#${m.id}</div></td>
+            <td data-label="Movement">${pill(R, m.reason)}</td>
+            <td class="full" data-label="Item"><div class="sku">${esc(m.sku)}${haz(s.hazard_class)}</div><div class="desc">${esc(s.description || "")}</div></td>
+            <td data-label="Route"><span class="route">${end(m.from_location, m.reason === "RECEIPT" ? "Supplier" : "Count")}${ic("arrow")}${end(m.to_location, "Customer")}</span></td>
+            <td class="num" data-label="Qty"><span class="qty ${sign}">${sign === "plus" ? "+" : sign === "minus" ? "−" : ""}${fmt(m.qty)}</span></td>
+            <td data-label="By">${whoCell(m.actor)}</td>
+          </tr>`; }).join("")}</tbody></table></div>
+        <div class="tbl-foot"><span>Showing <b>${fmt(rows.length)}</b> of ${plural(d.moves.length, "movement")}</span><span>Newest first · append-only</span></div>`;
+    },
+  },
+
+  // ------------------------------------------------------------------ audit
+  audit: {
+    title: "Audit", sub: "Stock re-derived from the ledger and reconciled",
+    async load() {
+      const [rec, thr] = await Promise.all([get("/reports/reconciliation"), get("/reports/throughput")]);
+      return { rec, thr, at: new Date() };
+    },
+    paint(d) {
+      const ok = d.rec.balanced;
+      const reasons = Object.entries(d.thr.by_reason || {});
+      const maxR = Math.max(1, ...reasons.map(([, v]) => v.units));
+      const actors = Object.entries(d.thr.by_actor || {});
+      const maxA = Math.max(1, ...actors.map(([, v]) => v.units));
+      return `
+        <section class="verdict ${ok ? "ok" : "bad"}">
+          <div class="v-badge ${ok ? "t-ok" : "t-bad"}">${ic(ok ? "audit" : "audit-bad")}</div>
+          <div class="v-body">
+            <div class="v-eyebrow">Ledger vs balance</div>
+            <h2 class="v-title">${ok ? "In balance" : `Out of balance — ${plural(d.rec.discrepancy_count, "discrepancy", "discrepancies")}`}</h2>
+            <p class="v-text">${ok
+              ? "Every unit on hand is accounted for by a movement. Stock is re-derived from the append-only ledger and compared with the balance table, and they agree."
+              : "The balance table holds stock the ledger cannot explain. Something changed stock without writing a movement — a manual fix, a migration, or a service that skipped the ledger. Count the locations below."}</p>
+            <div class="v-meta">${ic("clock")} Checked ${esc(dtf.format(d.at))} · answered by Insight on <span class="loc">${esc(d.rec.host || "—")}</span></div>
+          </div>
+          <button type="button" class="btn btn-secondary" data-action="refresh">${ic("refresh")}Re-run check</button>
+        </section>
+
+        ${ok ? "" : `<section class="card" style="margin-bottom:16px">
+          <div class="card-head"><div><h2>Locations to count</h2><div class="sub">Where the balance and the ledger disagree</div></div></div>
+          <div class="tbl-wrap"><table class="tbl rec">
+            <thead><tr><th>Item</th><th>Location</th><th class="num">Balance</th><th class="num">Ledger</th><th class="num">Difference</th></tr></thead>
+            <tbody>${d.rec.discrepancies.map(x => `<tr>
+              <td class="full" data-label="Item"><span class="sku">${esc(x.sku)}</span></td>
+              <td data-label="Location"><span class="loc">${esc(x.location)}</span></td>
+              <td class="num" data-label="Balance">${fmt(x.balance)}</td>
+              <td class="num" data-label="Ledger">${fmt(x.ledger)}</td>
+              <td class="num" data-label="Difference"><span class="qty" style="color:var(--bad)">${x.difference > 0 ? "+" : ""}${fmt(x.difference)}</span></td>
+            </tr>`).join("")}</tbody></table></div>
+        </section>`}
+
+        <div class="two-col">
+          <section class="card">
+            <div class="card-head"><div><h2>Throughput by movement</h2><div class="sub">Units moved, all time</div></div></div>
+            ${reasons.length ? `<div class="bars">${reasons.map(([k, v]) => { const R = REASONS[k] || { label: k, tone: "slate" };
+              return `<div class="bar-row"><div class="lab">${pill(R, k)}</div>
+                <div class="progress bar-${R.tone === "teal" ? "teal" : R.tone === "slate" ? "info" : R.tone}"><span style="width:${pct(v.units, maxR)}%"></span></div>
+                <div class="val">${fmt(v.units)}<small>${plural(v.movements, "move")}</small></div></div>`; }).join("")}</div>`
+              : emptyState("layers", "slate", "No movements yet", "Throughput appears once stock starts moving.")}
+          </section>
+          <section class="card">
+            <div class="card-head"><div><h2>Throughput by operator</h2><div class="sub">Attribution survives the session that did the work</div></div></div>
+            ${actors.length ? `<div class="bars">${actors.map(([k, v]) => { const a = parseActor(k);
+              return `<div class="bar-row"><div class="lab">${whoCell(k)}</div>
+                <div class="progress ${a.sys ? "bar-info" : ""}"><span style="width:${pct(v.units, maxA)}%"></span></div>
+                <div class="val">${fmt(v.units)}<small>units</small></div></div>`; }).join("")}</div>`
+              : emptyState("user", "slate", "No operators yet", "Every movement records who made it.")}
+          </section>
+        </div>`;
+    },
   },
 };
 
-// ------------------------------------------------------------------ driving
+// -------------------------------------------------------------------- shell
+let current = "overview", viewData = null, loadSeq = 0, lastSync = 0;
 
-let current = "stock";
+const skeleton = () => `<div class="kpis">${`<div class="card kpi" aria-hidden="true">
+    <div class="sk" style="height:13px;width:45%"></div><div class="sk" style="height:30px;width:58%;margin-top:14px"></div>
+    <div class="sk" style="height:12px;width:72%;margin-top:12px"></div></div>`.repeat(4)}</div>
+  <div class="card" style="padding:20px" aria-hidden="true"><div class="sk" style="height:16px;width:28%"></div>
+  ${`<div class="sk" style="height:46px;margin-top:14px"></div>`.repeat(4)}</div>
+  <span class="sr-only">Loading</span>`;
 
-async function render() {
+async function renderView({ quiet = false } = {}) {
+  const name = current, v = views[name], seq = ++loadSeq, view = $("#view");
+  view.setAttribute("aria-busy", "true");
+  if (!quiet) view.innerHTML = skeleton();
   try {
-    $("#panel").innerHTML = await panels[current]();
+    const data = await v.load();
+    if (seq !== loadSeq) return;                   // the user navigated away meanwhile
+    viewData = data;
+    const y = window.scrollY;
+    view.innerHTML = `<div class="${quiet ? "" : "enter"}">${v.paint(data)}</div>`;
+    if (quiet) window.scrollTo(0, y);
   } catch (e) {
-    $("#panel").innerHTML = `<p class="muted">${esc(e.message)}</p>`;
-    flash(e.message, false);
+    if (seq !== loadSeq) return;
+    view.innerHTML = `<section class="card">${emptyState("alert", "bad", `Couldn't load ${v.title.toLowerCase()}`, e.message,
+      `<button type="button" class="btn btn-primary" data-action="refresh">${ic("refresh")}Try again</button>`)}</section>`;
+  } finally {
+    if (seq === loadSeq) view.setAttribute("aria-busy", "false");
   }
-  refreshHeader();
 }
 
-async function refreshHeader() {
+function route() {
+  const name = location.hash.replace(/^#\/?/, "");
+  current = views[name] ? name : "overview";
+  $$(".nav-btn").forEach(a => a.dataset.route === current ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
+  $("#page-title").textContent = views[current].title;
+  $("#page-sub").textContent = views[current].sub;
+  document.title = `${views[current].title} · Plimsoll · Harbourline Logistics`;
+  return renderView();
+}
+
+// Counts, integrity and host only. Never repaints the view, so a background
+// refresh cannot wipe a quantity someone is halfway through typing.
+async function refreshMeta() {
+  const [orders, receipts, rec, health] = await Promise.allSettled([
+    get("/api/orders"), get("/api/receipts"), get("/reports/reconciliation"), get("/api/health")]);
+  const setCount = (r, n) => { const el = $(`.nav-btn[data-route="${r}"] .count`); el.textContent = n; el.hidden = !n;
+    el.setAttribute("aria-label", `${n} pending`); };
+  if (orders.status === "fulfilled") setCount("outbound", orders.value.filter(o => o.status !== "DISPATCHED").length);
+  if (receipts.status === "fulfilled") setCount("inbound", receipts.value.filter(r => r.expected > r.received).length);
+
+  const pillEl = $("#integrity"), dot = $('.nav-btn[data-route="audit"] .dot');
+  if (rec.status === "fulfilled") {
+    const ok = rec.value.balanced;
+    pillEl.className = `pill-status ${ok ? "ok" : "bad"}`;
+    pillEl.innerHTML = `${ic(ok ? "audit" : "audit-bad")}<span class="txt">${ok ? "Ledger in balance" : plural(rec.value.discrepancy_count, "discrepancy", "discrepancies")}</span>`;
+    pillEl.setAttribute("aria-label", ok ? "Ledger in balance" : `${rec.value.discrepancy_count} ledger discrepancies`);
+    dot.hidden = false; dot.classList.toggle("bad", !ok);
+  } else {
+    pillEl.className = "pill-status wait";
+    pillEl.innerHTML = `${ic("audit-bad")}<span class="txt">Insight unavailable</span>`;
+  }
+  const up = health.status === "fulfilled";
+  if (up) { $("#core-host").textContent = health.value.host || "—"; $("#core-env").textContent = health.value.env || "—"; }
+  $("#live").textContent = up ? "Live" : "Core unreachable";
+  $("#live").classList.toggle("off", !up);
+  if (up) { lastSync = Date.now(); }
+  stamp();
+}
+function stamp() {
+  const el = $("#updated");
+  if (!lastSync) { el.textContent = "Connecting…"; return; }
+  const s = Math.round((Date.now() - lastSync) / 1000);
+  el.textContent = s < 10 ? "Updated just now" : s < 60 ? `Updated ${s}s ago` : `Updated ${Math.round(s / 60)} min ago`;
+}
+
+async function refreshAll() {
+  const b = $('.topbar [data-action="refresh"]'); b.classList.add("spin");
+  delete cache.skus; delete cache.locations;
+  await Promise.allSettled([renderView({ quiet: true }), refreshMeta()]);
+  setTimeout(() => b.classList.remove("spin"), 300);
+}
+const afterChange = () => Promise.allSettled([renderView({ quiet: true }), refreshMeta()]);
+
+// ------------------------------------------------------------------ actions
+function readQty(btn) {
+  const input = btn.closest(".qty-ctl").querySelector("input");
+  const max = Number(btn.dataset.max), qty = Number.parseInt(input.value, 10);
+  if (!(qty >= 1 && qty <= max)) {
+    input.focus(); input.select();
+    toast("error", "Check the quantity", `Enter a whole number between 1 and ${fmt(max)}.`);
+    return null;
+  }
+  return qty;
+}
+
+async function doReceive(btn) {
+  const qty = readQty(btn); if (qty === null || !(await ensureOperator())) return;
+  busy(btn, true);
   try {
-    const [h, s, r] = await Promise.all([
-      get("/api/health"), get("/api/stock"), get("/reports/reconciliation")]);
-    $("#core-host").textContent = h.host;
-    $("#on-hand").textContent = s.on_hand;
-    const v = $("#verdict");
-    v.textContent = r.verdict;
-    v.className = "badge " + (r.balanced ? "ok" : "no");
-  } catch (e) {
-    $("#verdict").textContent = "UNREACHABLE";
-    $("#verdict").className = "badge no";
+    const r = await post(`/api/receipts/${encodeURIComponent(btn.dataset.id)}/receive`, { line_no: Number(btn.dataset.line), qty });
+    toast("success", `Received ${fmt(r.received)} × ${r.sku}`, `Into ${r.into}. Put it away from the Stock view.`);
+    await afterChange();
+  } catch (e) { toast("error", "Receipt refused", e.message); busy(btn, false); }
+}
+
+async function doPick(btn) {
+  const qty = readQty(btn); if (qty === null || !(await ensureOperator())) return;
+  busy(btn, true);
+  try {
+    const r = await post(`/api/orders/${encodeURIComponent(btn.dataset.id)}/pick`, { line_no: Number(btn.dataset.line), qty });
+    const from = (r.allocation || []).map(a => `${a.location} (${fmt(a.qty)})`).join(" + ");
+    toast("success", `Picked ${fmt(r.picked)} × ${r.sku}`,
+      `From ${from}. Order is ${(ORDER_STATUS[r.order_status] || { label: r.order_status }).label.toLowerCase()}.`);
+    await afterChange();
+  } catch (e) { toast("error", "Pick refused", e.message); busy(btn, false); }
+}
+
+async function doMove(btn) {
+  if (!(await ensureOperator())) return;
+  const { sku, loc } = btn.dataset, avail = Number(btn.dataset.qty);
+  let locs, skus;
+  try { [locs, skus] = await Promise.all([locList(), skuMap()]); }
+  catch (e) { return toast("error", "Couldn't load locations", e.message); }
+  const held = {}; ((viewData && viewData.stock && viewData.stock.lines) || []).filter(l => l.sku === sku).forEach(l => { held[l.location] = l.qty; });
+  const groups = Object.keys(ZONES).map(z => {
+    const opts = locs.filter(l => l.zone === z && l.code !== loc).map(l =>
+      `<option value="${esc(l.code)}">${esc(l.code)}${held[l.code] ? ` — already holds ${fmt(held[l.code])}` : ""}</option>`).join("");
+    return opts ? `<optgroup label="${esc(ZONES[z].name)}">${opts}</optgroup>` : "";
+  }).join("");
+  const s = skus[sku] || {};
+  const r = await modal({
+    title: "Move stock", icon: "move", tone: "violet",
+    sub: "A putaway changes where stock is. The total on hand does not change.",
+    body: `<div class="facts">
+        <div class="fact"><div class="l">Item</div><div class="v mono">${esc(sku)}</div><div class="s">${esc(s.description || "")}</div></div>
+        <div class="fact"><div class="l">From ${esc(loc)}</div><div class="v">${fmt(avail)} <span class="uom">${esc(s.uom || "")}</span></div><div class="s">available to move</div></div>
+      </div>
+      ${s.hazard_class ? `<div class="callout bad">${ic("hazard")}<span><b>Dangerous goods ${esc(s.hazard_class)}.</b> Check segregation rules before choosing a destination.</span></div>` : ""}
+      <label class="field"><span>Destination</span>
+        <select class="input" name="to" required><option value="" disabled selected>Choose a location…</option>${groups}</select></label>
+      <label class="field"><span>Quantity</span>
+        <input class="input" name="qty" type="number" inputmode="numeric" min="1" max="${avail}" value="${avail}" required>
+        <small>Up to ${fmt(avail)} at ${esc(loc)}.</small></label>`,
+    confirm: "Move stock",
+    onSubmit: fd => post("/api/putaway", { sku, from: loc, to: fd.to, qty: Number.parseInt(fd.qty, 10) }),
+  });
+  if (r) { toast("success", `Moved ${fmt(r.moved)} × ${r.sku}`, `${r.from} → ${r.to}`); await afterChange(); }
+}
+
+async function doDispatch(btn) {
+  if (!(await ensureOperator())) return;
+  const o = ((viewData && viewData.details) || []).find(x => x.id === btn.dataset.id);
+  if (!o) return;
+  const units = o.lines.reduce((n, l) => n + l.qty_picked, 0);
+  const r = await modal({
+    title: `Dispatch ${o.id}`, icon: "send", tone: "warn",
+    sub: `${o.customer} · ${plural(o.lines.length, "line")} · ${plural(units, "unit")}`,
+    body: `<div class="callout warn">${ic("alert")}<span><b>This can't be undone.</b> Dispatch removes ${plural(units, "unit")} from the building and creates a shipment.</span></div>
+      <div class="facts">${o.lines.map(l => `<div class="fact"><div class="l">Line ${l.line_no}</div><div class="v mono">${esc(l.sku)}</div><div class="s">${fmt(l.qty_picked)} picked</div></div>`).join("")}</div>
+      <label class="field"><span>Carrier</span><input class="input" name="carrier" required maxlength="60" value="Harbourline Freight"></label>`,
+    confirm: "Dispatch order", confirmClass: "btn-warn",
+    onSubmit: fd => post(`/api/orders/${encodeURIComponent(o.id)}/dispatch`, { carrier: String(fd.carrier || "").trim() || "Harbourline Freight" }),
+  });
+  if (r) {
+    toast("success", `Dispatched ${r.dispatched}`, `Shipment ${r.shipment} with ${r.carrier}.`);
+    ui.outTab = "shipped";
+    await afterChange();
   }
 }
 
-$("#tabs").addEventListener("click", (e) => {
-  const b = e.target.closest("button[data-tab]");
-  if (!b) return;
-  [...document.querySelectorAll("#tabs button")]
-    .forEach(x => x.setAttribute("aria-selected", String(x === b)));
-  current = b.dataset.tab;
-  render();
-});
-
-document.addEventListener("click", async (e) => {
-  const b = e.target.closest("button[data-receive],button[data-pick],button[data-dispatch],button[data-move]");
-  if (!b) return;
-  b.disabled = true;
-  try {
-    if (b.dataset.receive) {
-      const [id, line] = b.dataset.receive.split("|");
-      const qty = parseInt($(`#rq-${id}-${line}`).value, 10);
-      const res = await post(`/api/receipts/${id}/receive`, { line_no: +line, qty });
-      flash(`Received ${res.received} ${res.sku} into ${res.into}`, true);
-    } else if (b.dataset.pick) {
-      const [id, line] = b.dataset.pick.split("|");
-      const qty = parseInt($(`#pq-${id}-${line}`).value, 10);
-      const res = await post(`/api/orders/${id}/pick`, { line_no: +line, qty });
-      const from = res.allocation.map(a => `${a.location}×${a.qty}`).join(", ");
-      flash(`Picked ${res.picked} ${res.sku} from ${from} — order ${res.order_status}`, true);
-    } else if (b.dataset.dispatch) {
-      const res = await post(`/api/orders/${b.dataset.dispatch}/dispatch`, {});
-      flash(`Dispatched ${res.dispatched} as ${res.shipment}`, true);
-    } else if (b.dataset.move) {
-      const [sku, from] = b.dataset.move.split("|");
-      const to = prompt(`Move ${sku} from ${from} — destination location?`);
-      if (!to) { b.disabled = false; return; }
-      const qty = parseInt(prompt("Quantity?") || "0", 10);
-      if (!qty) { b.disabled = false; return; }
-      const res = await post("/api/putaway", { sku, from, to, qty });
-      flash(`Moved ${res.moved} ${res.sku} ${res.from} → ${res.to}`, true);
-    }
-  } catch (err) {
-    flash(err.message, false);
+// -------------------------------------------------------------- delegation
+document.addEventListener("click", e => {
+  const act = e.target.closest("[data-action]");
+  if (act) {
+    const a = act.dataset.action;
+    if (a === "refresh") return void refreshAll();
+    if (a === "operator") return void editOperator(false);
+    if (a === "receive") return void doReceive(act);
+    if (a === "pick") return void doPick(act);
+    if (a === "move") return void doMove(act);
+    if (a === "dispatch") return void doDispatch(act);
   }
-  render();
+  const z = e.target.closest("[data-zone]");
+  if (z && current === "stock") {
+    ui.stockZone = z.dataset.zone;
+    $$("[data-zone]").forEach(c => c.setAttribute("aria-pressed", String(c === z)));
+    $("#rows").innerHTML = views.stock.rows(viewData); return;
+  }
+  const r = e.target.closest("[data-reason]");
+  if (r && current === "ledger") {
+    ui.ledgerReason = r.dataset.reason;
+    $$("[data-reason]").forEach(c => c.setAttribute("aria-pressed", String(c === r)));
+    $("#rows").innerHTML = views.ledger.rows(viewData); return;
+  }
+  const t = e.target.closest("[data-outtab]");
+  if (t && current === "outbound") {
+    ui.outTab = t.dataset.outtab;
+    $("#view").innerHTML = `<div>${views.outbound.paint(viewData)}</div>`;
+    const sel = $(`[data-outtab="${ui.outTab}"]`); if (sel) sel.focus();
+  }
+});
+document.addEventListener("input", e => {
+  if (e.target.id === "stock-q")  { ui.stockQuery = e.target.value;  $("#rows").innerHTML = views.stock.rows(viewData); }
+  if (e.target.id === "ledger-q") { ui.ledgerQuery = e.target.value; $("#rows").innerHTML = views.ledger.rows(viewData); }
+});
+document.addEventListener("change", e => {
+  if (e.target.id === "stock-empty") { ui.hideEmpty = e.target.checked; $("#rows").innerHTML = views.stock.rows(viewData); }
+});
+document.addEventListener("keydown", e => {
+  if (e.target.closest("input, select, textarea, dialog") || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === "/") { const s = $("#stock-q, #ledger-q"); if (s) { e.preventDefault(); s.focus(); } }
+  if (e.key === "r" || e.key === "R") { e.preventDefault(); refreshAll(); }
+});
+// Enter in a quantity box performs that row's action.
+document.addEventListener("keydown", e => {
+  if (e.key !== "Enter" || !e.target.closest(".qty-ctl input")) return;
+  e.preventDefault(); const b = e.target.closest(".qty-ctl").querySelector("button"); if (b && !b.disabled) b.click();
 });
 
-render();
-setInterval(refreshHeader, 15000);
+// --------------------------------------------------------------------- boot
+const MARK = `<svg viewBox="0 0 64 64" role="img" aria-label="Harbourline logo">
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.4">
+    <circle cx="32" cy="13.6" r="4.6"/><path d="M32 18.2V45"/><path d="M23 24.6h18"/>
+    <path d="M17.6 31.6c0 8 6.4 13.4 14.4 13.4s14.4-5.4 14.4-13.4"/></g>
+  <path d="M9 54.2c4.6 0 4.6-3.6 9.2-3.6s4.6 3.6 9.2 3.6 4.6-3.6 9.2-3.6 4.6 3.6 9.2 3.6 4.6-3.6 9.2-3.6"
+        fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" opacity=".88"/></svg>`;
+$$("[data-logo]").forEach(el => { el.innerHTML = MARK; });
+$("#favicon").href = "data:image/svg+xml," + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+   <stop offset="0" stop-color="#0369a1"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs>
+   <rect width="64" height="64" rx="15" fill="url(#g)"/>${MARK.replace(/^<svg[^>]*>/, "").replace(/<\/svg>$/, "")}</svg>`);
+
+renderOperator();
+window.addEventListener("hashchange", () => { window.scrollTo(0, 0); route().then(() => $("#view").focus({ preventScroll: true })); });
+route();
+refreshMeta();
+setInterval(() => { if (!document.hidden) refreshMeta(); }, 20000);
+setInterval(stamp, 5000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshMeta(); });
 </script>
 </body>
 </html>
