@@ -55,6 +55,21 @@ A fifth environment exists on demand: **`kind-harbourline-tf`**, created by
 and one Application that hands everything else over to GitOps. `terraform
 destroy` removes it; `apply` brings it back in four minutes.
 
+Underneath all of it sits **`pve1`**, a Proxmox VE hypervisor, and
+[`terraform/proxmox`](terraform/proxmox/) creates VMs on it from code — a cloud
+image downloaded by the node, a static address, an SSH key injected by
+cloud-init, `apply` and `destroy` both proven. That closes the last hand-built
+layer: everything above the hypervisor was already declarative while the
+machines themselves were clicked together in Hyper-V. The intended end state is
+
+> Terraform → Proxmox VMs → kubeadm → cluster → Argo CD → Plimsoll
+
+The hypervisor is monitored by the same Grafana as everything else, through
+`prometheus-pve-exporter` in the kind cluster. The exporter runs *in the
+cluster* rather than on the hypervisor because WSL2 is NAT'd — the cluster can
+reach the LAN, nothing on the LAN can reach into WSL — so the cluster is always
+the client. The same constraint decided the cross-cluster Grafana datasource.
+
 Every command names its context explicitly — `--context kind-harbourline`,
 `--context harbourline-vm`, `--context kind-harbourline-tf`. The lab cluster is
 registered **only in WSL's kubeconfig**; see
@@ -176,8 +191,9 @@ billing
 ## Repository layout
 
 ```
-api/  web/  reports/     three services, each with a Dockerfile
-helm/harbourline/        one chart, three values files
+Makefile                 operator verbs: make status, make pve-verify, make render
+api/ web/ reports/ deck/ four services, each with a Dockerfile
+helm/harbourline/        one chart, four values files
 k8s/base/                Kustomize: db, config, ingress, NetworkPolicies
 k8s/argocd/              Argo CD Applications (app-of-apps)
 k8s/platform/            kind cluster Ingresses (Grafana, Argo CD)
@@ -188,6 +204,8 @@ k8s/vm-cluster/          MetalLB, Longhorn, Traefik, platform Ingresses
 k8s/eks/                 eksctl ClusterConfig, app manifests, teardown check
 k8s/labs/rbac/           RBAC labs and a privileged-permission audit
 terraform/kind-bootstrap/  a cluster + Argo CD, from nothing, in four minutes
+terraform/proxmox/       VMs as code on the Proxmox hypervisor
+scripts/                 sealing a credential without it touching disk
 docs/                    architecture, security decisions, runbooks
 tools/                   node prep, a kubectl plugin, a network probe
 ```
@@ -205,6 +223,7 @@ tools/                   node prep, a kubectl plugin, a network probe
 | Longhorn | `https://longhorn.hl.internal` | VM |
 | Prometheus | `https://prometheus.hl.internal` | VM |
 | Argo CD — Terraform lab | `http://localhost:8080` (port-forward) | `kind-harbourline-tf` |
+| Proxmox VE | `https://192.168.0.50:8006` | hypervisor |
 
 `*.hl.internal` resolves through the workstation's hosts file **and** the kind
 cluster's CoreDNS — browsers and pods are different clients and resolve
@@ -272,25 +291,35 @@ operated.
   they leak topology and workload names.
 - **TLS on `*.hl.internal` is a self-signed wildcard**, so the Grafana datasource
   runs with `tlsSkipVerify`. cert-manager with a local CA issuer is the fix.
-- **`cilium`, `metallb` and `kps` have no values files** — their install-time
-  `--set` flags exist only in shell history, which is exactly how a Helm upgrade
-  silently reverted a Service and broke a datasource on 16 Oct.
-- **Kyverno and Loki are not under Argo CD** — hand-installed, which is the same
-  gap they were introduced to close.
+- **`cilium` and `metallb` have no values files** — their install-time `--set`
+  flags exist only in shell history, which is exactly how a Helm upgrade
+  silently reverted a Service and broke a datasource on 16 Oct. `kps`, `loki`
+  and `alloy` have since been given values files and adopted by Argo CD; these
+  two have not.
 - metrics-server runs with `--kubelet-insecure-tls`; the real fix is
   `serverTLSBootstrap` plus CSR approval.
 - kubeadm certificate renewal has not been exercised.
-- **Four things stand between this repository and a working cluster**, found by
-  [rebuilding it from nothing](docs/rebuild-test.md): three hand-made secrets, a
-  node label (`tier=database`), a namespace created as a side effect of an
-  unrecorded `helm install`, and one image whose registry visibility differs
-  from its siblings. Everything else rebuilt from `main` with no human step.
+- **The rebuild test passes, but partly by luck.** All four gaps found by the
+  first [rebuild from nothing](docs/rebuild-test.md) are closed, and a cluster
+  built from `main` now reaches a green smoke test with no human step. However
+  `db-init` and the smoke test are PostSync hooks on *different* Applications,
+  which Argo syncs independently — the database happened to be seeded 28 seconds
+  before the test ran. One Application with ordered sync waves is the real fix.
 - **Headlamp's ServiceAccount is bound to `cluster-admin`** — the only
   non-built-in subject there. Not yet a decision; currently a default.
-- **`platform` is deliberately left failing** on the rebuilt cluster.
-  `CreateNamespace=true` would turn it green and leave an Ingress routing to a
-  Grafana that does not exist — a loud accurate failure converted into a silent
-  misconfiguration. It stays red until the monitoring stack is in Git.
+- **The Proxmox Terraform provider logs into the hypervisor as `root`.** The
+  Proxmox API has no endpoint for importing a disk image into a VM, so the
+  provider SSHes in and runs `qm importdisk`. The tighter arrangement is a
+  dedicated system user with a narrow sudoers entry for the few commands it
+  shells out to.
+- **`pve1` runs Proxmox 9.1, not 9.2.** The 9.2-1 installer ISO ships without
+  the Hyper-V kernel modules, so it cannot see its own installation media in a
+  Hyper-V guest ([Bugzilla #8027](https://bugzilla.proxmox.com/show_bug.cgi?id=8027)).
+  9.1 was installed instead; the in-place upgrade is outstanding.
+- **The Debian cloud image is pulled from `/latest/`.** The checksum is pinned,
+  so a rebuilt image fails the apply loudly rather than silently installing a
+  different operating system — but pinning the dated path and treating the bump
+  as a reviewed change is the honest version.
 - **20 Medium SonarCloud security issues have never been triaged.** They are
   what holds the overall Security rating at C.
 - **The Helm chart is excluded from the config scan** (`skip-dirs: helm`),
