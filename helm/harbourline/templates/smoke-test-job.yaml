@@ -72,7 +72,7 @@ spec:
   # No retries. A smoke test that retries until it passes is not a test.
   # The retry budget lives inside the script, bounded and visible.
   backoffLimit: 0
-  activeDeadlineSeconds: 180
+  activeDeadlineSeconds: 240
   ttlSecondsAfterFinished: 900
   template:
     spec:
@@ -119,7 +119,11 @@ spec:
               # explaining the failure were destroyed by the deadline that the
               # failure caused.
               #
-              # Now: 5 attempts at (3s + 2s) = 25s per check, 75s for three.
+              # Now: 5 attempts at (3s + 2s) = 25s per check. FIVE checks since
+              # 28 Nov, so 125s worst case against a 240s deadline. Adding a
+              # check without redoing this arithmetic is how the original bug
+              # came back; the deadline moved from 180 to 240 in the same commit
+              # that added the two WMS checks, deliberately.
               check() {
                 name="$1"; url="$2"; expect="$3"
                 i=1
@@ -167,6 +171,26 @@ spec:
 
               # The reports service aggregates over the same table.
               check "reports aggregates"         "http://harbourline-reports:8080/reports/summary" "total"
+
+              # THE WAREHOUSE HAS STOCK. Same browser path as above, but the
+              # WMS tables rather than shipments - so a schema that applied
+              # only halfway fails here rather than at 6am on a scanner.
+              check "web -> api -> stock"        "http://harbourline-web/api/stock"             "on_hand"
+
+              # THE WAREHOUSE AGREES WITH ITSELF.
+              #
+              # This is the check worth having. Insight re-derives stock from
+              # the movement ledger and compares it to the balance table; they
+              # must agree, because every change writes both inside one
+              # transaction. A deployment that leaves them disagreeing has
+              # produced a system whose numbers no longer describe the
+              # warehouse - and that is not visible from any probe, any
+              # dashboard, or any amount of green in Argo CD.
+              #
+              # Matching on IN-BALANCE rather than a JSON boolean: separators
+              # vary between JSON providers, and IN-BALANCE is not a substring
+              # of OUT-OF-BALANCE, so this cannot pass against a broken one.
+              check "ledger reconciles to balance" "http://harbourline-reports:8080/reports/reconciliation" "IN-BALANCE"
 
               echo
               if [ "$fail" -ne 0 ]; then

@@ -139,8 +139,16 @@ def reconciliation():
                  "ledger": r[3], "difference": r[2] - r[3]}
                 for r in cur.fetchall()
             ]
+        # `verdict` exists for machines that match on text - the smoke test
+        # greps this response. A boolean renders as `"balanced": true` or
+        # `"balanced":true` depending on the JSON provider's separators, and a
+        # check that depends on whitespace is a check that fails for the wrong
+        # reason one day. IN-BALANCE is not a substring of OUT-OF-BALANCE, so
+        # the match cannot succeed against a failing warehouse.
         return jsonify(host=socket.gethostname(),
                        balanced=not discrepancies,
+                       verdict="OUT-OF-BALANCE" if discrepancies else "IN-BALANCE",
+                       discrepancy_count=len(discrepancies),
                        discrepancies=discrepancies)
     except Exception as e:
         return jsonify(error=str(e)), 500

@@ -39,6 +39,24 @@ def test_reconciliation_is_balanced_when_the_ledger_is_complete(client, warehous
     body = client.get("/reports/reconciliation").get_json()
     assert body["balanced"] is True
     assert body["discrepancies"] == []
+    assert body["verdict"] == "IN-BALANCE"
+
+
+def test_the_verdict_tokens_cannot_be_confused_by_a_substring_match(client, warehouse, db):
+    """The smoke test greps this response, so the two verdicts must not overlap.
+
+    If the failing verdict contained the passing one, a broken warehouse would
+    pass the deployment check - the worst possible failure mode for a gate.
+    """
+    assert "IN-BALANCE" not in "OUT-OF-BALANCE"
+
+    with db.cursor() as cur:
+        cur.execute("UPDATE stock SET qty = qty + 1 WHERE sku = 'TEST-B'")
+    db.commit()
+
+    body = client.get("/reports/reconciliation").get_json()
+    assert body["verdict"] == "OUT-OF-BALANCE"
+    assert body["discrepancy_count"] == 1
 
 
 def test_reconciliation_catches_a_write_that_skipped_the_ledger(client, warehouse, db):
