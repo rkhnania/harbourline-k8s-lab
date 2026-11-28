@@ -67,3 +67,24 @@ INSERT INTO shipments (id, status, carrier) VALUES
   ('SHP-2002', 'delayed',      'Harbourline Freight'),
   ('SHP-3003', 'customs-hold', 'Harbourline Freight')
 ON CONFLICT (id) DO NOTHING;
+
+-- OPENING BALANCES ARE MOVEMENTS TOO.
+--
+-- Stock seeded straight into the balance table would be invisible to the
+-- ledger, and /reports/reconciliation - which re-derives the balance from
+-- movements and compares - would report a permanent discrepancy equal to the
+-- opening stock. A control report that is always wrong is a control report
+-- nobody reads.
+--
+-- So the opening count is recorded as what it actually is: an ADJUST movement
+-- with no source location, performed by whoever counted the warehouse on day
+-- one. Idempotent per row, because this file runs on every sync.
+INSERT INTO movements (sku, to_location, qty, reason, actor)
+SELECT s.sku, s.location, s.qty, 'ADJUST', 'seed/opening-balance'
+FROM stock s
+WHERE NOT EXISTS (
+    SELECT 1 FROM movements m
+    WHERE m.actor = 'seed/opening-balance'
+      AND m.sku = s.sku
+      AND m.to_location = s.location
+);

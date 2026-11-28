@@ -134,6 +134,12 @@ def wms(shipments_table):
                 "INSERT INTO stock (sku, location, qty) VALUES "
                 "('TEST-A', 'PICK-1', 10), ('TEST-A', 'BULK-1', 100)"
             )
+            # Opening balances are movements too, or the reconciliation report
+            # shows a permanent discrepancy equal to the opening stock.
+            cur.execute(
+                "INSERT INTO movements (sku, to_location, qty, reason, actor) "
+                "SELECT sku, location, qty, 'ADJUST', 'seed/opening-balance' FROM stock"
+            )
             cur.execute(
                 "INSERT INTO receipts (id, carrier) VALUES ('RCV-TEST', 'Test Carrier')"
             )

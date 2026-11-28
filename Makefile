@@ -18,7 +18,7 @@ CURL = curlimages/curl:8.11.1
 K = kubectl --context $(CTX)
 
 .PHONY: help status apps sync pve-seal pve-verify pve-logs pve-targets \
-        pve-restart deck-why render schema test-api test-deck
+        pve-restart deck-why render schema test-api test-deck test-reports
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -99,3 +99,18 @@ schema: ## Objects and row counts the init Job will produce
 test-deck: ## Run the deck suite on CI's Python (no database needed)
 	@docker run --rm -v "$$PWD":/w -w /w/deck python:3.12-slim sh -c \
 	   "pip install -q -r requirements-dev.txt && python -m pytest -q"
+
+test-reports: ## Run the reports suite on CI's Python against a throwaway Postgres
+	@docker rm -f plimsoll-test-db >/dev/null 2>&1 || true
+	@docker network create plimsoll-test >/dev/null 2>&1 || true
+	@docker run -d --rm --name plimsoll-test-db --network plimsoll-test \
+	   -e POSTGRES_PASSWORD=postgres postgres:16-alpine >/dev/null
+	@until docker exec plimsoll-test-db pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
+	@docker run --rm --network plimsoll-test -v "$$PWD":/w -w /w/reports \
+	   -e TEST_DB_HOST=plimsoll-test-db -e TEST_DB_PASSWORD=postgres \
+	   python:3.12-slim sh -c \
+	   "pip install -q -r requirements.txt -r requirements-dev.txt && python -m pytest -q"; \
+	 rc=$$?; \
+	 docker rm -f plimsoll-test-db >/dev/null 2>&1; \
+	 docker network rm plimsoll-test >/dev/null 2>&1; \
+	 exit $$rc

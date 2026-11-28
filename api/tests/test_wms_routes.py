@@ -166,7 +166,11 @@ def test_the_whole_loop_leaves_a_complete_audit_trail(client, wms):
     client.post("/orders/ORD-TEST/dispatch")
 
     reasons = [m["reason"] for m in client.get("/movements").get_json()]
-    assert set(reasons) == {"RECEIPT", "PUTAWAY", "PICK", "DISPATCH"}
+    # ADJUST is the opening balance. It belongs here: a ledger that cannot
+    # account for the stock that was already on the floor cannot be used to
+    # re-derive the balance, which is what /reports/reconciliation does.
+    # "Complete" means every unit has a movement, not only the ones we moved.
+    assert set(reasons) == {"ADJUST", "RECEIPT", "PUTAWAY", "PICK", "DISPATCH"}
 
     # 110 opening + 50 received - 25 dispatched
     assert _on_hand(client) == 135
