@@ -23,6 +23,9 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: sql
+          configMap:
+            name: harbourline-db-schema
       containers:
         - name: init
           image: postgres:16-alpine
@@ -34,6 +37,9 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: sql
+              mountPath: /sql
+              readOnly: true
           env:
             - name: PGPASSWORD
               valueFrom:
@@ -45,12 +51,23 @@ spec:
             - -c
             - |
               until pg_isready -h harbourline-db -U postgres; do echo waiting for db; sleep 2; done
-              psql -h harbourline-db -U postgres -v ON_ERROR_STOP=1 <<'SQL'
-              CREATE TABLE IF NOT EXISTS shipments (id text primary key, status text, carrier text);
-              INSERT INTO shipments VALUES
-                ('SHP-1001','in-transit','Harbourline Freight'),
-                ('SHP-2002','delayed','Harbourline Freight'),
-                ('SHP-3003','customs-hold','Harbourline Freight')
-              ON CONFLICT (id) DO NOTHING;
-              SQL
-              echo "schema and seed applied"
+
+              # ON_ERROR_STOP=1 is load-bearing. Without it psql reports failure
+              # for a statement, carries on with the rest of the file, and exits
+              # 0 - so the Job succeeds, Argo reports the Application Healthy,
+              # and the schema is half applied. A partially created schema is
+              # worse than none, because the failure surfaces later as an
+              # application error nobody connects to a deployment.
+              #
+              # Schema then seed, in that order, both idempotent: this Job is a
+              # PostSync hook and runs on every single sync, not just the first.
+              psql -h harbourline-db -U postgres -v ON_ERROR_STOP=1 -f /sql/schema.sql
+              psql -h harbourline-db -U postgres -v ON_ERROR_STOP=1 -f /sql/seed.sql
+
+              # Report what exists rather than asserting success. "schema
+              # applied" was previously printed unconditionally, which told you
+              # the echo ran and nothing else.
+              psql -h harbourline-db -U postgres -t -A -F' ' -c \
+                "SELECT 'tables=' || count(*) FROM information_schema.tables WHERE table_schema='public';"
+              psql -h harbourline-db -U postgres -t -A -F' ' -c \
+                "SELECT 'skus=' || (SELECT count(*) FROM skus) || ' locations=' || (SELECT count(*) FROM locations) || ' stock_lines=' || (SELECT count(*) FROM stock) || ' on_hand=' || (SELECT coalesce(sum(qty),0) FROM stock);"

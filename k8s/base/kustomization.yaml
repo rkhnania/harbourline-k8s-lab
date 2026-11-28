@@ -3,6 +3,26 @@ kind: Kustomization
 
 namespace: harbourline
 
+# THE SQL LIVES UNDER k8s/base/, NOT IN A TOP-LEVEL db/ DIRECTORY.
+# configMapGenerator may only read files at or below the kustomization root.
+# Argo CD runs kustomize with the default load restrictor, so `files:
+# ../../db/schema.sql` renders fine on a workstation that passes
+# --load-restrictor LoadRestrictionsNone and fails in the cluster. A layout
+# that only builds locally is worse than an awkward one that builds everywhere.
+configMapGenerator:
+  - name: harbourline-db-schema
+    files:
+      - sql/schema.sql
+      - sql/seed.sql
+
+generatorOptions:
+  # A stable name, because db-init-job.yaml references it directly. The usual
+  # argument for the hash - force a rollout when content changes - does not
+  # apply: the Job is a PostSync hook with hook-delete-policy
+  # BeforeHookCreation, so it is destroyed and recreated on every sync and
+  # always picks up the current ConfigMap.
+  disableNameSuffixHash: true
+
 resources:
 - configmap.yaml
 - db-secret-sealedsecret.yaml

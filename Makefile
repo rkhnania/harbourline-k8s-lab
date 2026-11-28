@@ -18,7 +18,7 @@ CURL = curlimages/curl:8.11.1
 K = kubectl --context $(CTX)
 
 .PHONY: help status apps sync pve-seal pve-verify pve-logs pve-targets \
-        pve-restart deck-why render
+        pve-restart deck-why render schema
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -67,5 +67,13 @@ deck-why: ## Why is a pod not starting - image, events, last state
 	@$(K) -n harbourline describe pod -l app.kubernetes.io/name=deck \
 	  | grep -iE "image:|reason|message|exit code" | tail -20
 
-render: ## Prove the monitoring directory still builds before pushing
-	@$(K) kustomize k8s/monitoring/manifests > /dev/null && echo "kustomize build OK"
+render: ## Prove every kustomize directory still builds before pushing
+	@for d in k8s/base k8s/monitoring/manifests k8s/platform k8s/policies; do \
+	   if [ -f $$d/kustomization.yaml ]; then \
+	     $(K) kustomize $$d > /dev/null && echo "  OK   $$d" || echo "  FAIL $$d"; \
+	   fi; \
+	 done
+
+schema: ## Objects and row counts the init Job will produce
+	@$(K) -n harbourline exec sts/harbourline-db -- psql -U postgres -c "\\dt" 2>/dev/null \
+	  || echo "database not reachable - is the harbourline Application synced?"
