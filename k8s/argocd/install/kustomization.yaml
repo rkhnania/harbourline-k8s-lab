@@ -1,0 +1,29 @@
+# The ApplicationSet CRD, vendored at the version Argo CD actually runs.
+#
+# WHY THIS DIRECTORY EXISTS.
+# Argo CD on kind-harbourline was installed from the upstream raw manifest with
+# a client-side `kubectl apply`. That stores every object in a
+# last-applied-configuration annotation, which the API server caps at 262144
+# bytes. This CRD is 1,394,817 bytes - 5.3x the limit - so it was the one
+# object in that manifest that did not land.
+#
+# The failure was invisible for weeks. argocd-applicationset-controller starts,
+# tries to build a watch cache for a kind the API server has never heard of,
+# retries for two minutes, times out and exits; Kubernetes restarts it and it
+# does the whole thing again. Nothing in this lab uses ApplicationSets, so
+# nothing broke - which is exactly why nobody looked. `make status` surfaced it
+# the first time anything asked what is NOT healthy rather than what is.
+#
+# PINNED TO v3.5.3, the running argocd-server image. A CRD from a newer release
+# can declare fields the installed controller does not understand, and the
+# mismatch shows up as validation errors on objects that look correct.
+#
+# NEAR A HARDER LIMIT: etcd refuses objects above ~1.5 MiB (1572864 bytes).
+# This is 1.39 MiB. There is roughly 180 KB of headroom, so a future Argo CD
+# release could make this CRD unappliable by any method. Worth knowing before
+# it happens rather than during an upgrade.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - applicationset-crd.yaml

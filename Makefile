@@ -68,10 +68,11 @@ deck-why: ## Why is a pod not starting - image, events, last state
 	  | grep -iE "image:|reason|message|exit code" | tail -20
 
 render: ## Prove every kustomize directory still builds before pushing
-	@for d in k8s/base k8s/monitoring/manifests k8s/platform k8s/policies; do \
-	   if [ -f $$d/kustomization.yaml ]; then \
-	     $(K) kustomize $$d > /dev/null && echo "  OK   $$d" || echo "  FAIL $$d"; \
-	   fi; \
+	@# Discovered, not listed. A hardcoded list silently stops covering a
+	@# directory the day someone adds one - which is the same failure shape as
+	@# the CI path filter that left deck unbuilt for two weeks.
+	@for d in $$(find k8s -name kustomization.yaml -printf '%h\n' | sort); do \
+	   $(K) kustomize $$d > /dev/null && echo "  OK   $$d" || echo "  FAIL $$d"; \
 	 done
 
 test-api: ## Run the api suite on CI's Python against a throwaway Postgres

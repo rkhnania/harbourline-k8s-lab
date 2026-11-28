@@ -1,0 +1,37 @@
+# Argo CD installs its own missing CRD.
+#
+# Not a bootstrap paradox: the Application controller needs only the
+# `applications` CRD, which is present. It is the applicationset controller
+# that is broken, and it is not involved in applying this.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-crds
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/rkhnania/harbourline-k8s-lab.git
+    targetRevision: main
+    path: k8s/argocd/install
+  destination:
+    server: https://kubernetes.default.svc
+    # Cluster-scoped object; the namespace is where Argo tracks it, not where
+    # the CRD lives.
+    namespace: argocd
+  syncPolicy:
+    automated:
+      selfHeal: true
+      # PRUNE IS OFF, DELIBERATELY.
+      # Deleting a CRD deletes every custom resource of that kind, cluster
+      # wide, with no confirmation. A renamed file or a mistyped path would be
+      # enough. The same reasoning keeps prune off on the VM cluster's
+      # vm-platform Application, which owns the IPAddressPool serving Argo
+      # CD's own UI: prune is the setting that turns a typo into an outage.
+      prune: false
+    syncOptions:
+      # THE WHOLE POINT. Server-side apply writes no
+      # last-applied-configuration annotation, so the 262144-byte cap that
+      # dropped this CRD in the first place does not apply. Without this line
+      # the sync fails exactly the way the original install did.
+      - ServerSideApply=true
