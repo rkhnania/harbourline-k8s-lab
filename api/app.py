@@ -177,6 +177,37 @@ def movements():
         return jsonify(cur.fetchall())
 
 
+@app.route("/receipts")
+def receipts():
+    """Inbound loads. The portal needs a list; a detail route is not enough."""
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            "SELECT r.id, r.carrier, r.status, r.arrived_at, "
+            "       coalesce(sum(rl.qty_expected), 0) AS expected, "
+            "       coalesce(sum(rl.qty_received), 0) AS received "
+            "FROM receipts r LEFT JOIN receipt_lines rl ON rl.receipt_id = r.id "
+            "GROUP BY r.id, r.carrier, r.status, r.arrived_at ORDER BY r.id;")
+        return jsonify(cur.fetchall())
+
+
+@app.route("/orders")
+def orders():
+    """Outbound orders, newest first. ?status= filters."""
+    status = request.args.get("status")
+    sql = ("SELECT o.id, o.customer, o.status, o.created_at, "
+           "       coalesce(sum(ol.qty), 0) AS ordered, "
+           "       coalesce(sum(ol.qty_picked), 0) AS picked "
+           "FROM orders o LEFT JOIN order_lines ol ON ol.order_id = o.id ")
+    params = []
+    if status:
+        sql += "WHERE o.status = %s "
+        params.append(status)
+    sql += "GROUP BY o.id, o.customer, o.status, o.created_at ORDER BY o.created_at DESC, o.id;"
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
+        return jsonify(cur.fetchall())
+
+
 @app.route("/receipts/<receipt_id>")
 def receipt(receipt_id):
     with _connect() as conn, conn.cursor() as cur:

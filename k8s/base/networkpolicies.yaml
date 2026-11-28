@@ -349,3 +349,46 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+---
+# Portal proxies Insight, so the portal now talks to two tiers rather than one.
+# Both halves are required: default-deny-ingress and default-deny-egress are
+# both in force, so a missing egress rule and a missing ingress rule fail
+# identically - a timeout, with nothing logged anywhere. curl exit 28, which
+# the smoke test already knows to read as "suspect NetworkPolicy".
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-reports
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-reports
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: harbourline-web
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-web-to-reports-egress
+spec:
+  podSelector:
+    matchLabels:
+      app: harbourline-web
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: harbourline-reports
+      ports:
+        - protocol: TCP
+          port: 8080

@@ -3,115 +3,374 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Harbourline — Shipment Tracking</title>
+<title>Plimsoll — Harbourline Logistics</title>
 <style>
   :root{
-    --bg:#f5f7fa; --card:#fff; --ink:#0f172a; --muted:#64748b;
-    --line:#e2e8f0; --brand:#0d9488; --brand2:#0369a1;
-    --transit:#0369a1; --transitbg:#e0f2fe;
-    --delayed:#b45309; --delayedbg:#fef3c7;
-    --hold:#be123c;    --holdbg:#ffe4e6;
+    --bg:#0f1419; --panel:#161c23; --line:#232c36; --fg:#dde5ec; --dim:#8a97a4;
+    --accent:#3fb6a8; --warn:#d9a441; --bad:#d9534f; --good:#5aa469;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
-  @media (prefers-color-scheme:dark){
-    :root{ --bg:#0b1220; --card:#121c2e; --ink:#e8eefc; --muted:#94a3b8; --line:#1e2b45;
-           --transitbg:#0c2a40; --delayedbg:#3a2a08; --holdbg:#3d1020; }
+  @media (prefers-color-scheme:light){
+    :root{--bg:#f4f6f8;--panel:#fff;--line:#dde3e9;--fg:#1b2730;--dim:#5e6e7c;}
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-       font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  header{background:linear-gradient(120deg,var(--brand2),var(--brand));color:#fff;
-         padding:26px 20px;box-shadow:0 2px 14px rgba(0,0,0,.18)}
-  .bar{max-width:1000px;margin:0 auto;display:flex;align-items:center;gap:14px}
-  .bar h1{margin:0;font-size:1.45rem;letter-spacing:-.02em}
-  .bar p{margin:2px 0 0;opacity:.85;font-size:.85rem}
-  main{max-width:1000px;margin:0 auto;padding:22px 20px 60px}
-  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
-  .tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
-  .tile .n{font-size:2rem;font-weight:700;line-height:1}
-  .tile .l{color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.06em;margin-top:6px}
-  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-  table{width:100%;border-collapse:collapse}
-  th{text-align:left;font-size:.75rem;letter-spacing:.07em;text-transform:uppercase;
-     color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--line)}
-  td{padding:13px 16px;border-bottom:1px solid var(--line)}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  header{display:flex;flex-wrap:wrap;gap:16px;align-items:center;
+         padding:14px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .brand{font-weight:700;letter-spacing:.14em;font-size:19px}
+  .brand span{color:var(--accent)}
+  .sub{color:var(--dim);font-size:13px}
+  .spacer{flex:1}
+  .chip{font-family:var(--mono);font-size:12px;color:var(--dim);
+        border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+  .chip b{color:var(--fg);font-weight:600}
+  .badge{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;
+         border-radius:999px;padding:4px 12px}
+  .ok{background:rgba(90,164,105,.15);color:var(--good);border:1px solid var(--good)}
+  .no{background:rgba(217,83,79,.15);color:var(--bad);border:1px solid var(--bad)}
+  input{background:var(--bg);color:var(--fg);border:1px solid var(--line);
+        border-radius:6px;padding:5px 9px;font:inherit;font-family:var(--mono);font-size:13px}
+  nav{display:flex;gap:2px;padding:0 20px;border-bottom:1px solid var(--line);
+      background:var(--panel);overflow-x:auto}
+  nav button{background:none;border:0;border-bottom:2px solid transparent;color:var(--dim);
+             padding:11px 15px;font:inherit;cursor:pointer;white-space:nowrap}
+  nav button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--accent)}
+  main{padding:20px;max-width:1200px}
+  h2{font-size:14px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);
+     margin:0 0 10px}
+  .cards{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:12px 16px;min-width:120px}
+  .card .n{font-family:var(--mono);font-size:24px;font-weight:600}
+  .card .l{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+  table{width:100%;border-collapse:collapse;background:var(--panel);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+     color:var(--dim);padding:9px 12px;border-bottom:1px solid var(--line);font-weight:600}
+  td{padding:9px 12px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px}
   tr:last-child td{border-bottom:0}
-  tr:hover td{background:rgba(125,125,125,.06)}
-  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
-  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;
-        font-size:.78rem;font-weight:600}
-  .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
-  .s-in-transit{color:var(--transit);background:var(--transitbg)}
-  .s-delayed{color:var(--delayed);background:var(--delayedbg)}
-  .s-customs-hold{color:var(--hold);background:var(--holdbg)}
-  footer{max-width:1000px;margin:18px auto 0;padding:0 20px;color:var(--muted);font-size:.8rem}
-  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#22c55e;margin-right:6px}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .muted{color:var(--dim)}
+  button.act{background:var(--accent);color:#06211f;border:0;border-radius:6px;
+             padding:5px 11px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+  button.act.ghost{background:none;color:var(--accent);border:1px solid var(--accent)}
+  button.act:disabled{opacity:.4;cursor:not-allowed}
+  .flash{margin-bottom:14px;padding:10px 14px;border-radius:8px;font-family:var(--mono);
+         font-size:13px;display:none}
+  .flash.show{display:block}
+  .flash.good{background:rgba(90,164,105,.14);border:1px solid var(--good);color:var(--good)}
+  .flash.bad{background:rgba(217,83,79,.14);border:1px solid var(--bad);color:var(--bad)}
+  .wrap{overflow-x:auto}
+  .z{display:inline-block;font-size:11px;padding:1px 7px;border-radius:4px;
+     border:1px solid var(--line);color:var(--dim)}
+  footer{padding:16px 20px;color:var(--dim);font-size:12px;border-top:1px solid var(--line)}
 </style>
 </head>
 <body>
+
 <header>
-  <div class="bar">
-    <svg width="46" height="46" viewBox="0 0 64 64" role="img" aria-label="Harbourline logo">
-      <circle cx="32" cy="32" r="30" fill="rgba(255,255,255,.14)"/>
-      <path d="M32 11v30" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
-      <circle cx="32" cy="16" r="5" fill="none" stroke="#fff" stroke-width="4"/>
-      <path d="M17 33a15 15 0 0 0 30 0" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
-      <path d="M22 26h20" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
-      <path d="M8 52c5 0 5-4 10-4s5 4 10 4 5-4 10-4 5 4 10 4 5-4 8-4"
-            fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" opacity=".85"/>
-    </svg>
-    <div>
-      <h1>Harbourline</h1>
-      <p>Shipment Tracking</p>
-    </div>
+  <div>
+    <div class="brand">PLIM<span>SOLL</span></div>
+    <div class="sub">Harbourline Logistics — warehouse management</div>
   </div>
+  <div class="spacer"></div>
+  <label class="chip">operator <input id="operator" size="10" value="portal"></label>
+  <span class="chip">core <b id="core-host">—</b></span>
+  <span class="chip">on hand <b id="on-hand">—</b></span>
+  <span id="verdict" class="badge">CHECKING</span>
 </header>
 
+<nav id="tabs">
+  <button data-tab="stock"   aria-selected="true">Stock</button>
+  <button data-tab="inbound" aria-selected="false">Inbound</button>
+  <button data-tab="outbound" aria-selected="false">Outbound</button>
+  <button data-tab="ledger"  aria-selected="false">Ledger</button>
+  <button data-tab="audit"   aria-selected="false">Audit</button>
+</nav>
+
 <main>
-  <div class="tiles" id="tiles"></div>
-  <div class="panel">
-    <table>
-      <thead><tr><th>Shipment</th><th>Origin</th><th>Destination</th><th>Status</th></tr></thead>
-      <tbody id="rows"><tr><td colspan="4" style="color:var(--muted)">Loading…</td></tr></tbody>
-    </table>
-  </div>
-  <footer id="foot"></footer>
+  <div id="flash" class="flash"></div>
+  <section id="panel"></section>
 </main>
 
+<footer>
+  Portal proxies Core at <code>/api/</code> and Insight at <code>/reports/</code>.
+  Every movement is written to the ledger with the operator named above.
+</footer>
+
 <script>
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const label = s => s.replace(/-/g,' ').replace(/\b\w/g, m => m.toUpperCase());
+// Plimsoll Portal.
+//
+// No framework and no build step on purpose: this tier is nginx serving one
+// static file, and adding a toolchain would mean a build stage, a lockfile and
+// a supply chain for a page that renders six tables.
+//
+// Everything is same-origin. nginx proxies Core at /api/ and Insight at
+// /reports/, so there is no CORS policy to maintain and no second Ingress to
+// authenticate later.
 
-async function load(){
-  try{
-    const ship = await (await fetch('/api/shipments')).json();
-    const rows = Object.entries(ship).map(([id,s]) => `<tr>
-        <td><code>${esc(id)}</code></td>
-        <td>${esc(s.origin)}</td>
-        <td>${esc(s.destination)}</td>
-        <td><span class="pill s-${esc(s.status)}">${esc(label(s.status))}</span></td>
-      </tr>`).join('');
-    document.getElementById('rows').innerHTML = rows ||
-      '<tr><td colspan="4" style="color:var(--muted)">No shipments</td></tr>';
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, c =>
+  ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
 
-    const counts = {};
-    Object.values(ship).forEach(s => counts[s.status] = (counts[s.status]||0)+1);
-    const tiles = [['Total', Object.keys(ship).length]]
-      .concat(Object.entries(counts).map(([k,v]) => [label(k), v]));
-    document.getElementById('tiles').innerHTML = tiles
-      .map(([l,n]) => `<div class="tile"><div class="n">${n}</div><div class="l">${esc(l)}</div></div>`)
-      .join('');
-  }catch(e){
-    document.getElementById('rows').innerHTML =
-      '<tr><td colspan="4" style="color:#be123c">Could not reach the API</td></tr>';
-  }
-  try{
-    const h = await (await fetch('/api/health')).json();
-    document.getElementById('foot').innerHTML =
-      `<span class="dot"></span>Served by <code>${esc(h.host)}</code> · environment <code>${esc(h.env)}</code>`;
-  }catch(e){}
+function flash(msg, good) {
+  const el = $("#flash");
+  el.textContent = msg;
+  el.className = "flash show " + (good ? "good" : "bad");
+  clearTimeout(flash._t);
+  flash._t = setTimeout(() => el.className = "flash", 6000);
 }
-load();
-setInterval(load, 15000);
+
+async function get(path) {
+  const r = await fetch(path, { headers: { "Accept": "application/json" } });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error || `${path} returned ${r.status}`);
+  return body;
+}
+
+// Core answers a refused movement with 409 and a body explaining WHY -
+// insufficient stock, over-receipt, order not picked. Showing that text is the
+// difference between an operator who knows what to do next and one who does
+// not. "Request failed" is never shown if Core said something better.
+async function post(path, payload) {
+  const r = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...payload, actor: `portal/${$("#operator").value || "anon"}` }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const why = body.error || `HTTP ${r.status}`;
+    throw new Error(body.constraint ? `${why} (${body.constraint})` : why);
+  }
+  return body;
+}
+
+const rows = (arr, cells) => arr.map(cells).join("") ||
+  `<tr><td class="muted" colspan="9">nothing to show</td></tr>`;
+
+// ------------------------------------------------------------------ panels
+
+const panels = {
+  async stock() {
+    const [s, byZone] = await Promise.all([get("/api/stock"), get("/reports/stock")]);
+    const zones = Object.entries(byZone.by_zone || {});
+    return `
+      <div class="cards">
+        ${zones.map(([z, q]) => `
+          <div class="card"><div class="n">${q}</div><div class="l">${esc(z)}</div></div>`).join("")}
+        <div class="card"><div class="n">${s.on_hand}</div><div class="l">on hand</div></div>
+      </div>
+      <h2>Stock by location</h2>
+      <div class="wrap"><table>
+        <tr><th>SKU</th><th>Location</th><th>Zone</th><th class="num">Qty</th><th></th></tr>
+        ${rows(s.lines, r => `<tr>
+          <td>${esc(r.sku)}</td><td>${esc(r.location)}</td>
+          <td><span class="z">${esc(r.zone)}</span></td>
+          <td class="num">${r.qty}</td>
+          <td><button class="act ghost" data-move="${esc(r.sku)}|${esc(r.location)}">Move</button></td>
+        </tr>`)}
+      </table></div>`;
+  },
+
+  async inbound() {
+    const receipts = await get("/api/receipts");
+    const detail = await Promise.all(receipts.map(r => get(`/api/receipts/${r.id}`)));
+    return `
+      <h2>Inbound loads</h2>
+      ${detail.map(r => `
+        <div style="margin-bottom:18px">
+          <div class="cards" style="margin-bottom:8px">
+            <div class="card">
+              <div class="n">${esc(r.id)}</div>
+              <div class="l">${esc(r.carrier)} — ${esc(r.status)}</div>
+            </div>
+          </div>
+          <div class="wrap"><table>
+            <tr><th>Line</th><th>SKU</th><th class="num">Expected</th>
+                <th class="num">Received</th><th>Receive</th></tr>
+            ${rows(r.lines, l => {
+              const left = l.qty_expected - l.qty_received;
+              return `<tr>
+                <td>${l.line_no}</td><td>${esc(l.sku)}</td>
+                <td class="num">${l.qty_expected}</td>
+                <td class="num">${l.qty_received}</td>
+                <td>
+                  <input size="4" value="${left}" id="rq-${esc(r.id)}-${l.line_no}" ${left ? "" : "disabled"}>
+                  <button class="act" data-receive="${esc(r.id)}|${l.line_no}" ${left ? "" : "disabled"}>Receive</button>
+                </td></tr>`;
+            })}
+          </table></div>
+        </div>`).join("") || `<p class="muted">No inbound loads.</p>`}`;
+  },
+
+  async outbound() {
+    const orders = await get("/api/orders");
+    const detail = await Promise.all(orders.map(o => get(`/api/orders/${o.id}`)));
+    return `
+      <h2>Orders</h2>
+      ${detail.map(o => `
+        <div style="margin-bottom:18px">
+          <div class="cards" style="margin-bottom:8px">
+            <div class="card">
+              <div class="n">${esc(o.id)}</div>
+              <div class="l">${esc(o.customer)} — ${esc(o.status)}</div>
+            </div>
+            <div class="card" style="display:flex;align-items:center">
+              <button class="act" data-dispatch="${esc(o.id)}"
+                ${o.status === "PICKED" ? "" : "disabled"}>Dispatch</button>
+            </div>
+          </div>
+          <div class="wrap"><table>
+            <tr><th>Line</th><th>SKU</th><th class="num">Ordered</th>
+                <th class="num">Picked</th><th>Pick</th></tr>
+            ${rows(o.lines, l => {
+              const left = l.qty - l.qty_picked;
+              return `<tr>
+                <td>${l.line_no}</td><td>${esc(l.sku)}</td>
+                <td class="num">${l.qty}</td><td class="num">${l.qty_picked}</td>
+                <td>
+                  <input size="4" value="${left}" id="pq-${esc(o.id)}-${l.line_no}" ${left ? "" : "disabled"}>
+                  <button class="act" data-pick="${esc(o.id)}|${l.line_no}" ${left ? "" : "disabled"}>Pick</button>
+                </td></tr>`;
+            })}
+          </table></div>
+        </div>`).join("") || `<p class="muted">No orders.</p>`}`;
+  },
+
+  async ledger() {
+    const m = await get("/api/movements?limit=100");
+    return `
+      <h2>Movement ledger — append only</h2>
+      <div class="wrap"><table>
+        <tr><th>#</th><th>When</th><th>SKU</th><th>From</th><th>To</th>
+            <th class="num">Qty</th><th>Reason</th><th>Actor</th></tr>
+        ${rows(m, r => `<tr>
+          <td>${r.id}</td>
+          <td class="muted">${esc(String(r.occurred_at).replace("T", " ").slice(0, 19))}</td>
+          <td>${esc(r.sku)}</td>
+          <td>${esc(r.from_location) || '<span class="muted">—</span>'}</td>
+          <td>${esc(r.to_location) || '<span class="muted">—</span>'}</td>
+          <td class="num">${r.qty}</td>
+          <td><span class="z">${esc(r.reason)}</span></td>
+          <td class="muted">${esc(r.actor)}</td>
+        </tr>`)}
+      </table></div>`;
+  },
+
+  async audit() {
+    const [rec, open] = await Promise.all([
+      get("/reports/reconciliation"), get("/reports/open-orders")]);
+    return `
+      <h2>Ledger vs balance</h2>
+      <div class="cards">
+        <div class="card">
+          <div class="n" style="color:${rec.balanced ? "var(--good)" : "var(--bad)"}">
+            ${esc(rec.verdict)}</div>
+          <div class="l">${rec.discrepancy_count} discrepancies</div>
+        </div>
+      </div>
+      <p class="muted" style="max-width:62ch">
+        Stock is re-derived from the movement ledger and compared to the balance
+        table. They must agree: every change writes both inside one transaction.
+        A difference means something wrote to stock without a movement.
+      </p>
+      ${rec.discrepancies.length ? `<div class="wrap"><table>
+        <tr><th>SKU</th><th>Location</th><th class="num">Balance</th>
+            <th class="num">Ledger</th><th class="num">Diff</th></tr>
+        ${rows(rec.discrepancies, d => `<tr>
+          <td>${esc(d.sku)}</td><td>${esc(d.location)}</td>
+          <td class="num">${d.balance}</td><td class="num">${d.ledger}</td>
+          <td class="num" style="color:var(--bad)">${d.difference}</td></tr>`)}
+      </table></div>` : ""}
+      <h2 style="margin-top:24px">Open orders</h2>
+      <div class="wrap"><table>
+        <tr><th>Order</th><th>Customer</th><th>Status</th>
+            <th class="num">Ordered</th><th class="num">Picked</th><th class="num">Fill</th></tr>
+        ${rows(open.open_orders, o => `<tr>
+          <td>${esc(o.id)}</td><td>${esc(o.customer)}</td>
+          <td><span class="z">${esc(o.status)}</span></td>
+          <td class="num">${o.ordered}</td><td class="num">${o.picked}</td>
+          <td class="num">${Math.round(o.fill_rate * 100)}%</td></tr>`)}
+      </table></div>`;
+  },
+};
+
+// ------------------------------------------------------------------ driving
+
+let current = "stock";
+
+async function render() {
+  try {
+    $("#panel").innerHTML = await panels[current]();
+  } catch (e) {
+    $("#panel").innerHTML = `<p class="muted">${esc(e.message)}</p>`;
+    flash(e.message, false);
+  }
+  refreshHeader();
+}
+
+async function refreshHeader() {
+  try {
+    const [h, s, r] = await Promise.all([
+      get("/api/health"), get("/api/stock"), get("/reports/reconciliation")]);
+    $("#core-host").textContent = h.host;
+    $("#on-hand").textContent = s.on_hand;
+    const v = $("#verdict");
+    v.textContent = r.verdict;
+    v.className = "badge " + (r.balanced ? "ok" : "no");
+  } catch (e) {
+    $("#verdict").textContent = "UNREACHABLE";
+    $("#verdict").className = "badge no";
+  }
+}
+
+$("#tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-tab]");
+  if (!b) return;
+  [...document.querySelectorAll("#tabs button")]
+    .forEach(x => x.setAttribute("aria-selected", String(x === b)));
+  current = b.dataset.tab;
+  render();
+});
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-receive],button[data-pick],button[data-dispatch],button[data-move]");
+  if (!b) return;
+  b.disabled = true;
+  try {
+    if (b.dataset.receive) {
+      const [id, line] = b.dataset.receive.split("|");
+      const qty = parseInt($(`#rq-${id}-${line}`).value, 10);
+      const res = await post(`/api/receipts/${id}/receive`, { line_no: +line, qty });
+      flash(`Received ${res.received} ${res.sku} into ${res.into}`, true);
+    } else if (b.dataset.pick) {
+      const [id, line] = b.dataset.pick.split("|");
+      const qty = parseInt($(`#pq-${id}-${line}`).value, 10);
+      const res = await post(`/api/orders/${id}/pick`, { line_no: +line, qty });
+      const from = res.allocation.map(a => `${a.location}×${a.qty}`).join(", ");
+      flash(`Picked ${res.picked} ${res.sku} from ${from} — order ${res.order_status}`, true);
+    } else if (b.dataset.dispatch) {
+      const res = await post(`/api/orders/${b.dataset.dispatch}/dispatch`, {});
+      flash(`Dispatched ${res.dispatched} as ${res.shipment}`, true);
+    } else if (b.dataset.move) {
+      const [sku, from] = b.dataset.move.split("|");
+      const to = prompt(`Move ${sku} from ${from} — destination location?`);
+      if (!to) { b.disabled = false; return; }
+      const qty = parseInt(prompt("Quantity?") || "0", 10);
+      if (!qty) { b.disabled = false; return; }
+      const res = await post("/api/putaway", { sku, from, to, qty });
+      flash(`Moved ${res.moved} ${res.sku} ${res.from} → ${res.to}`, true);
+    }
+  } catch (err) {
+    flash(err.message, false);
+  }
+  render();
+});
+
+render();
+setInterval(refreshHeader, 15000);
 </script>
 </body>
 </html>

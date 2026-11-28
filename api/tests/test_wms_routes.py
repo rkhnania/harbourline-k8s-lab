@@ -174,3 +174,41 @@ def test_the_whole_loop_leaves_a_complete_audit_trail(client, wms):
 
     # 110 opening + 50 received - 25 dispatched
     assert _on_hand(client) == 135
+
+
+# ------------------------------------------------------------------- listings
+
+
+def test_orders_listing_carries_progress(client, wms):
+    """The portal lists orders before it knows any order id.
+
+    Returning progress in the listing avoids N+1 detail calls just to render a
+    table - the list already answers "how far through is it".
+    """
+    body = client.get("/orders").get_json()
+    row = [o for o in body if o["id"] == "ORD-TEST"][0]
+    assert row["customer"] == "Test Customer"
+    assert row["ordered"] == 25
+    assert row["picked"] == 0
+
+    client.post("/orders/ORD-TEST/pick", json={"line_no": 1, "qty": 10})
+    row = [o for o in client.get("/orders").get_json() if o["id"] == "ORD-TEST"][0]
+    assert row["picked"] == 10
+    assert row["status"] == "PICKING"
+
+
+def test_orders_listing_can_be_filtered_by_status(client, wms):
+    assert [o["id"] for o in client.get("/orders?status=NEW").get_json()] == ["ORD-TEST"]
+    assert client.get("/orders?status=DISPATCHED").get_json() == []
+
+
+def test_receipts_listing_totals_expected_and_received(client, wms):
+    row = client.get("/receipts").get_json()[0]
+    assert row["id"] == "RCV-TEST"
+    assert row["expected"] == 50
+    assert row["received"] == 0
+
+    client.post("/receipts/RCV-TEST/receive", json={"line_no": 1, "qty": 20})
+    row = client.get("/receipts").get_json()[0]
+    assert row["received"] == 20
+    assert row["status"] == "ARRIVED"
