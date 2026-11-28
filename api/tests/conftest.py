@@ -63,15 +63,90 @@ def shipments_table():
     )
     with psycopg.connect(conninfo) as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "CREATE TABLE IF NOT EXISTS shipments "
-                "(id int PRIMARY KEY, status text, carrier text)"
-            )
+            _apply_schema(cur)
             cur.execute("TRUNCATE shipments")
+            # Text ids, because that is what the real schema declares. The
+            # fixture used `id int` until 28 Nov while production used text -
+            # a suite that passes against a database no deployment has. The
+            # assertions did not change, because JSON object keys are strings
+            # either way, which is exactly why the drift went unnoticed.
             cur.execute(
                 "INSERT INTO shipments (id, status, carrier) VALUES "
-                "(1, 'in_transit', 'DHL'), (2, 'delivered', 'DHL'), "
-                "(3, 'delivered', 'Toll')"
+                "('1', 'in_transit', 'DHL'), ('2', 'delivered', 'DHL'), "
+                "('3', 'delivered', 'Toll')"
+            )
+        conn.commit()
+    yield
+
+
+SCHEMA_SQL = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "k8s", "base", "sql", "schema.sql",
+)
+
+
+def _apply_schema(cur):
+    """Apply the SAME schema file the cluster applies.
+
+    Not a copy of it. A schema defined twice drifts, and the tests then prove
+    something about a database that exists nowhere.
+    """
+    with open(SCHEMA_SQL, encoding="utf-8") as fh:
+        cur.execute(fh.read())
+
+
+@pytest.fixture
+def wms(shipments_table):
+    """A small, deterministic warehouse, rebuilt for every test.
+
+    Function-scoped and truncated each time, because every test here MOVES
+    stock. Sharing warehouse state between tests makes failures depend on
+    execution order, which is the worst kind of flaky.
+
+    The shape is deliberate: TEST-A has 10 units on the pick face and 100 in
+    bulk, and the open order asks for 25. So a correct pick must take the pick
+    face first and then fall back to bulk, and a test can assert the order
+    rather than just the total.
+    """
+    import psycopg
+
+    conninfo = (
+        f"host={os.environ['DB_HOST']} port={os.environ['DB_PORT']} "
+        f"user={os.environ['DB_USER']} password={os.environ['DB_PASSWORD']} "
+        f"dbname={os.environ['DB_NAME']} connect_timeout=3"
+    )
+    with psycopg.connect(conninfo) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "TRUNCATE movements, stock, order_lines, orders, "
+                "receipt_lines, receipts, locations, skus RESTART IDENTITY CASCADE"
+            )
+            cur.execute(
+                "INSERT INTO skus (sku, description, uom) VALUES "
+                "('TEST-A', 'Test widget', 'EA'), ('TEST-B', 'Test gadget', 'EA')"
+            )
+            cur.execute(
+                "INSERT INTO locations (code, zone, capacity) VALUES "
+                "('RECV-01', 'RECV', 1000), ('BULK-1', 'BULK', 1000), "
+                "('PICK-1', 'PICK', 100), ('DISP-01', 'DISP', 1000)"
+            )
+            cur.execute(
+                "INSERT INTO stock (sku, location, qty) VALUES "
+                "('TEST-A', 'PICK-1', 10), ('TEST-A', 'BULK-1', 100)"
+            )
+            cur.execute(
+                "INSERT INTO receipts (id, carrier) VALUES ('RCV-TEST', 'Test Carrier')"
+            )
+            cur.execute(
+                "INSERT INTO receipt_lines (receipt_id, line_no, sku, qty_expected) "
+                "VALUES ('RCV-TEST', 1, 'TEST-B', 50)"
+            )
+            cur.execute(
+                "INSERT INTO orders (id, customer) VALUES ('ORD-TEST', 'Test Customer')"
+            )
+            cur.execute(
+                "INSERT INTO order_lines (order_id, line_no, sku, qty) "
+                "VALUES ('ORD-TEST', 1, 'TEST-A', 25)"
             )
         conn.commit()
     yield

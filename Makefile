@@ -18,7 +18,7 @@ CURL = curlimages/curl:8.11.1
 K = kubectl --context $(CTX)
 
 .PHONY: help status apps sync pve-seal pve-verify pve-logs pve-targets \
-        pve-restart deck-why render schema
+        pve-restart deck-why render schema test-api
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -73,6 +73,24 @@ render: ## Prove every kustomize directory still builds before pushing
 	     $(K) kustomize $$d > /dev/null && echo "  OK   $$d" || echo "  FAIL $$d"; \
 	   fi; \
 	 done
+
+test-api: ## Run the api suite on CI's Python against a throwaway Postgres
+	@# WSL python is 3.14; CI and the runtime images are 3.12. A pass on the
+	@# wrong interpreter is weaker evidence than no pass at all, because it
+	@# feels like proof. This runs the suite the way CI will run it.
+	@docker rm -f plimsoll-test-db >/dev/null 2>&1 || true
+	@docker network create plimsoll-test >/dev/null 2>&1 || true
+	@docker run -d --rm --name plimsoll-test-db --network plimsoll-test \
+	   -e POSTGRES_PASSWORD=postgres postgres:16-alpine >/dev/null
+	@until docker exec plimsoll-test-db pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done
+	@docker run --rm --network plimsoll-test -v "$$PWD":/w -w /w/api \
+	   -e TEST_DB_HOST=plimsoll-test-db -e TEST_DB_PASSWORD=postgres \
+	   python:3.12-slim sh -c \
+	   "pip install -q -r requirements.txt -r requirements-dev.txt && python -m pytest -q"; \
+	 rc=$$?; \
+	 docker rm -f plimsoll-test-db >/dev/null 2>&1; \
+	 docker network rm plimsoll-test >/dev/null 2>&1; \
+	 exit $$rc
 
 schema: ## Objects and row counts the init Job will produce
 	@$(K) -n harbourline exec sts/harbourline-db -- psql -U postgres -c "\\dt" 2>/dev/null \
