@@ -67,6 +67,7 @@ reachable from WSL only.
 | Code quality | [SonarCloud](https://sonarcloud.io/project/overview?id=rkhnania_harbourline-k8s-lab) |
 | History | [Commits on `main`](https://github.com/rkhnania/harbourline-k8s-lab/commits/main) |
 | Operator commands | `make help` — [`Makefile`](Makefile) |
+| Architecture board | [Miro — all seven diagrams](https://miro.com/app/board/uXjVEaGZDfM=/) |
 
 **Start here:** [WMS architecture](docs/wms-architecture.md) ·
 [runtime architecture](docs/architecture.md) ·
@@ -88,6 +89,8 @@ database with a standby — and
 [`docs/wms-architecture.md`](docs/wms-architecture.md) works through what
 translates to Kubernetes and what does not. Oracle RAC does not, and saying so
 is more useful than a diagram where everything fits.
+
+![Plimsoll WMS — how one pick moves through the tiers](docs/images/diagram-plimsoll.png)
 
 ---
 
@@ -162,6 +165,11 @@ cluster* rather than on the hypervisor because WSL2 is NAT'd — the cluster can
 reach the LAN, nothing on the LAN can reach into WSL — so the cluster is always
 the client. The same constraint decided the cross-cluster Grafana datasource.
 
+![Proxmox — the hypervisor as code, and watched](docs/images/diagram-proxmox.png)
+
+The same diagrams, with the VM cluster's networking, MetalLB and Longhorn, are
+on the [architecture board](https://miro.com/app/board/uXjVEaGZDfM=/).
+
 Every command names its context explicitly — `--context kind-harbourline`,
 `--context harbourline-vm`, `--context kind-harbourline-tf`. The lab cluster is
 registered **only in WSL's kubeconfig**; see
@@ -171,23 +179,7 @@ registered **only in WSL's kubeconfig**; see
 
 ## Delivery pipeline
 
-```mermaid
-flowchart LR
-  dev["Developer"] --> pr["Pull request"]
-  pr --> test["test<br/>pytest + Postgres"]
-  test --> sonar["sonar<br/>SonarCloud<br/>quality gate"]
-  sonar --> build["build<br/>image + Trivy"]
-  scan["scan<br/>Trivy fs + config"] --> deploy
-  build --> deploy["deploy<br/>bump image tag"]
-  build --> ghcr[("GHCR")]
-  deploy -->|"commit"| git[("Git · main")]
-  git --> argo["Argo CD"]
-  argo --> kind["kind cluster"]
-  argo --> smoke["smoke test<br/>PostSync hook"]
-  ghcr --> kind
-  dev -.->|"docker push"| ecr[("Amazon ECR")]
-  ecr -.-> eks["EKS<br/>(on demand)"]
-```
+![Delivery — from git push to a running pod](docs/images/diagram-delivery.png)
 
 **Most stages can refuse.** A failing test, a HIGH vulnerability or a
 Kubernetes misconfiguration each stop the pipeline — verified by opening a
@@ -302,7 +294,7 @@ terraform/kind-bootstrap/  a cluster + Argo CD, from nothing, in four minutes
 terraform/proxmox/       VMs as code on the Proxmox hypervisor
 scripts/                 sealing a credential without it touching disk
 docs/                    architecture, security decisions, runbooks
-docs/images/             Portal screenshots
+docs/images/             Portal screenshots and architecture diagrams
 tools/                   node prep, a kubectl plugin, a network probe
 ```
 
